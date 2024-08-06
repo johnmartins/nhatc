@@ -1,24 +1,27 @@
 import numpy as np
-from pymoo.problems.functional import FunctionalProblem
-from pymoo.algorithms.moo.nsga2 import NSGA2
-from pymoo.operators.sampling.rnd import FloatRandomSampling
-from pymoo.operators.mutation.pm import PM
-from pymoo.operators.crossover.sbx import SBX
-from pymoo.termination import get_termination
-from pymoo.optimize import minimize
+
 from nhatc.models import ATCVariable, Coordinator
 from numpy.linalg import norm
 
-algorithm = NSGA2(
-    pop_size=40,
-    n_offsprings=10,
-    sampling=FloatRandomSampling(),
-    crossover=SBX(prob=0.9, eta=15),
-    mutation=PM(eta=20),
-    eliminate_duplicates=True
-)
 
-termination = get_termination("n_gen", 40)
+
+
+def subproblem_1(X):
+    # wrt u1, v, b1
+    X[2] = np.log(X[0]) + np.log(X[1]) + np.log(X[3])
+    return X[0] + X[1] + X[2] + X[3]
+
+
+def subproblem_2(X):
+    # wrt u2, w, a2
+    X[7] = np.pow(X[4], -1) + np.pow(X[5], -1) + np.pow(X[6], -1)
+    return 0
+
+# TODO: Define inequalities. Consider making subproblems their own class,
+#  containing their functions and constraint functions.
+#  furthermore, add optimization step to coordinator, and update variables.
+
+x0 = np.array([5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0])
 
 coordinator = Coordinator()
 coordinator.set_variables([
@@ -31,5 +34,5 @@ coordinator.set_variables([
     ATCVariable(6, 1, False, [2], 0, 10),
     ATCVariable(7, 1, True, [4], 0, 10)
 ])
-
-coordinator.optimize(10, np.array([1,2,3,4,5,6,7,8,9,10]))
+coordinator.set_subproblems([subproblem_1, subproblem_2])
+coordinator.optimize(10, x0)

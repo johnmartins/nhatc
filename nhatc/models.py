@@ -1,7 +1,16 @@
 from typing import Callable
+
 from numpy import inf
 from numpy.linalg import norm
 import numpy as np
+
+from pymoo.problems.functional import FunctionalProblem
+from pymoo.algorithms.moo.nsga2 import NSGA2
+from pymoo.operators.sampling.rnd import FloatRandomSampling
+from pymoo.operators.mutation.pm import PM
+from pymoo.operators.crossover.sbx import SBX
+from pymoo.termination import get_termination
+from pymoo.optimize import minimize
 
 
 class ATCVariable:
@@ -28,6 +37,16 @@ class ATCVariable:
 
 class Coordinator:
 
+    algorithm = NSGA2(
+        pop_size=40,
+        n_offsprings=10,
+        sampling=FloatRandomSampling(),
+        crossover=SBX(prob=0.9, eta=15),
+        mutation=PM(eta=20),
+        eliminate_duplicates=True
+    )
+    termination = get_termination("n_gen", 40)
+
     def __init__(self):
         self.variables: list[ATCVariable] = []     # Array of variables
         self.subproblems = []
@@ -39,9 +58,13 @@ class Coordinator:
         self.n_q = 0
         self.I = []
         self.I_prime = []
-        self.scaling_vector = np.array([])      # s
-        self.linear_weights = np.array([])      # v
-        self.quadratic_weights = np.array([])   # w
+        self.scaling_vector = np.array([], dtype=float)      # s
+        self.linear_weights = np.array([], dtype=float)      # v
+        self.quadratic_weights = np.array([], dtype=float)   # w
+        self.function_in_evaluation = None
+        self.q_current = np.array([], dtype=float)
+        self.xl_array = []
+        self.xu_array = []
 
     def set_variables(self, variables: list[ATCVariable]):
         self.variables = variables
@@ -62,6 +85,15 @@ class Coordinator:
         self.update_scaling_vector()
         self.linear_weights = np.zeros(self.n_q)
         self.quadratic_weights = np.ones(self.n_q)
+        self.update_boundary_arrays()
+
+    def update_boundary_arrays(self):
+        self.xl_array = np.zeros(self.n_vars, dtype=float)
+        self.xu_array = np.zeros(self.n_vars, dtype=float)
+
+        for i, var in enumerate(self.variables):
+            self.xl_array[i] = var.lb
+            self.xu_array[i] = var.ub
 
     def update_scaling_vector(self):
         delta_array = []
@@ -108,6 +140,18 @@ class Coordinator:
     def set_subproblems(self, subproblems: list[Callable]):
         self.subproblems = subproblems
 
+    def evaluate_subproblem(self, X):
+        function_result = self.function_in_evaluation(X)
+        penalty_result = self.penalty_function(self.q_current)
+        return function_result + penalty_result
+
+    def run_subproblem_optimization(self, X, subproblem):
+        problem = FunctionalProblem(self.n_vars,
+                                    [self.evaluate_subproblem],
+                                    constr_ieq=[],
+                                    xl=self.xl_array,
+                                    xu=self.xu_array)
+
     def optimize(self, i_max_outerloop: 10, initial_targets):
         """
 
@@ -117,7 +161,7 @@ class Coordinator:
         """
         # Initial targets and inconsistencies
         X = initial_targets
-        q_current = np.zeros(self.n_q)
+        self.q_current = np.zeros(self.n_q)
 
         convergence_threshold = 0.1
         max_iterations = i_max_outerloop
@@ -126,15 +170,15 @@ class Coordinator:
         while iteration < max_iterations:
             print(f"Outer iteration {iteration}")
 
-            for sub_problem in self.subproblems:
-                pass
+            for subproblem in self.subproblems:
+                self.run_subproblem_optimization(X, subproblem)
 
             # Update scaled inconsistency vector q (NOT c)
-            q_previous = np.copy(q_current)
-            q_current = self.get_updated_inconsistency_vector(X)
-            self.update_weights(q_current, q_previous)
+            q_previous = np.copy(self.q_current)
+            self.q_current = self.get_updated_inconsistency_vector(X)
+            self.update_weights(self.q_current, q_previous)
 
-            epsilon = norm(q_previous - q_current)
+            epsilon = norm(q_previous - self.q_current)
             if epsilon < convergence_threshold:
                 print("Convergence achieved.")
                 break
