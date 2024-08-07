@@ -4,37 +4,29 @@ from numpy import inf
 from numpy.linalg import norm
 import numpy as np
 
-from pymoo.problems.functional import FunctionalProblem
-from pymoo.algorithms.moo.nsga2 import NSGA2
-from pymoo.operators.sampling.rnd import FloatRandomSampling
-from pymoo.operators.mutation.pm import PM
-from pymoo.operators.crossover.sbx import SBX
-from pymoo.termination import get_termination
-from pymoo.optimize import minimize
+from scipy.optimize import minimize
 
 
 class SubProblem:
-    def __init__(self, variable_indices: list[int],
-                 constant_builders: list[Callable]):
-        self.variable_indices: list[int] = variable_indices
-        self.constant_builders = constant_builders
-        self.C = np.zeros(len(constant_builders), dtype=float)
+    def __init__(self, index: int):
+        self.index = index
         self.objective_function: Optional[Callable] = None
         self.inequality_constraints: list[Callable] = []
         self.equality_constraints: list[Callable] = []
-        self.constants: list[Callable] = []
 
     def set_objective(self, function: Callable):
         self.objective_function = function
 
-    def update_constants(self, X):
-        for i in range(0, len(self.constant_builders)):
-            self.C[i] = self.constant_builders[i](X)
+    def set_ineqs(self, ineqs: list[Callable]):
+        self.inequality_constraints = ineqs
+
+    def set_eqs(self, eqs: list[Callable]):
+        self.equality_constraints = eqs
 
 
 class ATCVariable:
 
-    def __init__(self, index: int, subproblem_index: int,
+    def __init__(self, name: str, index: int, subproblem_index: int,
                  coupled_variable: bool, links: list[int],
                  lb: -inf, ub: inf):
         """
@@ -46,6 +38,7 @@ class ATCVariable:
         :param lb: lower bound
         :param ub: upper bound
         """
+        self.name = name
         self.index = index
         self.subproblem_index = subproblem_index
         self.coupled_variable = coupled_variable
@@ -56,16 +49,6 @@ class ATCVariable:
 
 class Coordinator:
 
-    algorithm = NSGA2(
-        pop_size=40,
-        n_offsprings=10,
-        sampling=FloatRandomSampling(),
-        crossover=SBX(prob=0.9, eta=15),
-        mutation=PM(eta=20),
-        eliminate_duplicates=True
-    )
-    termination = get_termination("n_gen", 40)
-
     def __init__(self):
         self.variables: list[ATCVariable] = []     # Array of variables
         self.subproblems = []
@@ -73,6 +56,9 @@ class Coordinator:
         self.gamma = 0.25
 
         # Runtime variables
+        self.X = np.array([], dtype=float)
+        self.XD_indices = []
+        self.XC_indices = []
         self.n_vars = 0   # Number of variables
         self.n_q = 0
         self.I = []
@@ -80,10 +66,12 @@ class Coordinator:
         self.scaling_vector = np.array([], dtype=float)      # s
         self.linear_weights = np.array([], dtype=float)      # v
         self.quadratic_weights = np.array([], dtype=float)   # w
+        self.subsystem_in_evaluation = -1
         self.function_in_evaluation = None
         self.q_current = np.array([], dtype=float)
         self.xl_array = []
         self.xu_array = []
+        self.var_name_map = {}
 
     def set_variables(self, variables: list[ATCVariable]):
         self.variables = variables
@@ -101,10 +89,21 @@ class Coordinator:
         assert len(self.I) == len(self.I_prime)
         self.n_q = len(self.I)
 
+        self.update_variable_name_map()
         self.update_scaling_vector()
         self.linear_weights = np.zeros(self.n_q)
         self.quadratic_weights = np.ones(self.n_q)
         self.update_boundary_arrays()
+
+    def update_variable_name_map(self):
+        self.var_name_map = {}
+        for variable in self.variables:
+            if variable.name in self.var_name_map:
+                raise NameError(f'Variable names need to be unique. Found duplicate: {variable.name}')
+
+            self.var_name_map[variable.name] = variable.index
+
+        return self.var_name_map
 
     def update_boundary_arrays(self):
         self.xl_array = np.zeros(self.n_vars, dtype=float)
@@ -123,13 +122,13 @@ class Coordinator:
             delta_array.append(delta)
         self.scaling_vector = np.array(delta_array)
 
-    def get_updated_inconsistency_vector(self, X):
+    def get_updated_inconsistency_vector(self):
         """
         Returns the scaled inconsistency vector q
         :param X: current values of X
         :return:
         """
-        x_term = (X[self.I] - X[self.I_prime])
+        x_term = (self.X[self.I] - self.X[self.I_prime])
         scale_term = (self.scaling_vector[self.I] + self.scaling_vector[self.I_prime])/2
         return x_term / scale_term
 
@@ -151,41 +150,69 @@ class Coordinator:
             else:
                 self.quadratic_weights[i] = self.beta * w[i]
 
-    def penalty_function(self, scaled_inconsistency_vector):
-        q = scaled_inconsistency_vector
+    def penalty_function(self):
+        q = self.get_updated_inconsistency_vector()
         squared_eucl_norm = np.pow(norm(self.quadratic_weights * q), 2)
         return np.dot(self.linear_weights, q) + squared_eucl_norm
 
-    def set_subproblems(self, subproblems: list[Callable]):
+    def set_subproblems(self, subproblems: list[SubProblem]):
         self.subproblems = subproblems
 
-    def evaluate_subproblem(self, X):
-        function_result = self.function_in_evaluation(X)
-        penalty_result = self.penalty_function(self.q_current)
-        return function_result + penalty_result
+    def get_variables(self, var_names: list[str]):
+        vars = []
+        for var_name in var_names:
+            vars.append(self.X[self.var_name_map[var_name]])
 
-    def run_subproblem_optimization(self, X, subproblem, xl, xu):
+        return vars
 
-        # TODO: Update constants
+    def evaluate_subproblem(self, XD):
+        self.X[self.XD_indices] = XD
 
-        problem = FunctionalProblem(self.n_vars,
-                                    [self.evaluate_subproblem],
-                                    constr_ieq=[],
-                                    constr_eq=[],
-                                    xl=np.array([xl]),
-                                    xu=np.array([xu]))
+        obj, y = self.function_in_evaluation(self.X)
+        self.X[self.XC_indices] = y
+        penalty_result = self.penalty_function()
+        # print(f'subproblem {self.subsystem_in_evaluation} returns y = {y}')
+        # print(self.X)
+        # print(f'Penalty = {self.q_current}')
 
-        res = minimize(problem, Coordinator.algorithm, Coordinator.termination,
-                       seed=1,
-                       save_history=True,
-                       verbose=True)
-        X_star = res.X
-        F_star = res.F
+        return obj + penalty_result
 
+    def run_subproblem_optimization(self, subproblem):
+        print(f'Evaluating subproblem j = {self.subsystem_in_evaluation}')
 
+        self.function_in_evaluation = subproblem.objective_function
+        self.XD_indices = []
+        self.XC_indices = []
+        bounds = []
 
+        for var in self.variables:
+            if var.subproblem_index == subproblem.index and var.coupled_variable:
+                # Coupled variable
+                self.XC_indices.append(var.index)
+            elif var.subproblem_index == subproblem.index:
+                # Design variable
+                bounds.append([self.xl_array[var.index], self.xu_array[var.index]])
+                self.XD_indices.append(var.index)
+            else:
+                continue
 
+        constraints = []
+        for c_ineq in subproblem.inequality_constraints:
+            constraints.append({'type': 'ineq', 'fun': c_ineq})
 
+        for c_eq in subproblem.equality_constraints:
+            constraints.append({'type': 'eq', 'fun': c_eq})
+
+        res = minimize(self.evaluate_subproblem, self.X[self.XD_indices],
+                       method='COBYLA', # Let scipy decide, depending on presence of bounds and constraints
+                       bounds=bounds, # Tuple of (min, max)
+                       constraints=constraints) # List of dicts
+
+        self.q_current = self.get_updated_inconsistency_vector()
+
+        assert res.success, (f"Optimization process failed "
+                             f"unexpectadly in subproblem {self.subsystem_in_evaluation}"
+                             f"\nReason: {res.message}")
 
     def optimize(self, i_max_outerloop: 10, initial_targets):
         """
@@ -195,29 +222,29 @@ class Coordinator:
         :return:
         """
         # Initial targets and inconsistencies
-        X = initial_targets
+        self.X = initial_targets
+        assert self.X.size == len(self.variables), "Initial guess x0 does not match specified variable vector size"
         self.q_current = np.zeros(self.n_q)
 
-        convergence_threshold = 0.1
+        convergence_threshold = 0.0001
         max_iterations = i_max_outerloop
         iteration = 0
 
         while iteration < max_iterations:
             print(f"Outer iteration {iteration}")
+            q_previous = np.copy(self.q_current)
 
             for j, subproblem in enumerate(self.subproblems):
-                self.run_subproblem_optimization(X, subproblem,
-                                                 xl=self.xl_array[j],
-                                                 xu=self.xu_array[j])
+                self.subsystem_in_evaluation = j
+                self.run_subproblem_optimization(subproblem)
 
-            # Update scaled inconsistency vector q (NOT c)
-            q_previous = np.copy(self.q_current)
-            self.q_current = self.get_updated_inconsistency_vector(X)
             self.update_weights(self.q_current, q_previous)
 
             epsilon = norm(q_previous - self.q_current)
             if epsilon < convergence_threshold:
-                print("Convergence achieved.")
+                print(f'{self.q_current}')
+                print(f'Epsilon = {epsilon}')
+                print(f"Convergence achieved after {iteration+1} iterations.")
                 break
 
             iteration += 1
