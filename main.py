@@ -80,6 +80,6 @@ sp2.set_objective(sp2_objective)
 sp2.set_ineqs([sp2_ieq])
 
 
-x0 = np.array([5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0])
+x0 = np.array([8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0])
 coordinator.set_subproblems([sp1, sp2])
-coordinator.optimize(10, x0)
+coordinator.optimize(100, x0)

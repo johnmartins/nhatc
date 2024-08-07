@@ -204,7 +204,7 @@ class Coordinator:
             constraints.append({'type': 'eq', 'fun': c_eq})
 
         res = minimize(self.evaluate_subproblem, self.X[self.XD_indices],
-                       method='COBYLA', # Let scipy decide, depending on presence of bounds and constraints
+                       method=None, # Let scipy decide, depending on presence of bounds and constraints
                        bounds=bounds, # Tuple of (min, max)
                        constraints=constraints) # List of dicts
 
@@ -230,7 +230,7 @@ class Coordinator:
         max_iterations = i_max_outerloop
         iteration = 0
 
-        while iteration < max_iterations:
+        while iteration < max_iterations-1:
             print(f"Outer iteration {iteration}")
             q_previous = np.copy(self.q_current)
 
@@ -245,7 +245,9 @@ class Coordinator:
                 print(f'{self.q_current}')
                 print(f'Epsilon = {epsilon}')
                 print(f"Convergence achieved after {iteration+1} iterations.")
-                break
+                return
 
             iteration += 1
+
+        print(f"Failed to converge after {iteration+1} iterations")
 
