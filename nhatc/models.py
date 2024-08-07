@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Optional
 
 from numpy import inf
 from numpy.linalg import norm
@@ -11,6 +11,25 @@ from pymoo.operators.mutation.pm import PM
 from pymoo.operators.crossover.sbx import SBX
 from pymoo.termination import get_termination
 from pymoo.optimize import minimize
+
+
+class SubProblem:
+    def __init__(self, variable_indices: list[int],
+                 constant_builders: list[Callable]):
+        self.variable_indices: list[int] = variable_indices
+        self.constant_builders = constant_builders
+        self.C = np.zeros(len(constant_builders), dtype=float)
+        self.objective_function: Optional[Callable] = None
+        self.inequality_constraints: list[Callable] = []
+        self.equality_constraints: list[Callable] = []
+        self.constants: list[Callable] = []
+
+    def set_objective(self, function: Callable):
+        self.objective_function = function
+
+    def update_constants(self, X):
+        for i in range(0, len(self.constant_builders)):
+            self.C[i] = self.constant_builders[i](X)
 
 
 class ATCVariable:
@@ -145,12 +164,28 @@ class Coordinator:
         penalty_result = self.penalty_function(self.q_current)
         return function_result + penalty_result
 
-    def run_subproblem_optimization(self, X, subproblem):
+    def run_subproblem_optimization(self, X, subproblem, xl, xu):
+
+        # TODO: Update constants
+
         problem = FunctionalProblem(self.n_vars,
                                     [self.evaluate_subproblem],
                                     constr_ieq=[],
-                                    xl=self.xl_array,
-                                    xu=self.xu_array)
+                                    constr_eq=[],
+                                    xl=np.array([xl]),
+                                    xu=np.array([xu]))
+
+        res = minimize(problem, Coordinator.algorithm, Coordinator.termination,
+                       seed=1,
+                       save_history=True,
+                       verbose=True)
+        X_star = res.X
+        F_star = res.F
+
+
+
+
+
 
     def optimize(self, i_max_outerloop: 10, initial_targets):
         """
@@ -170,8 +205,10 @@ class Coordinator:
         while iteration < max_iterations:
             print(f"Outer iteration {iteration}")
 
-            for subproblem in self.subproblems:
-                self.run_subproblem_optimization(X, subproblem)
+            for j, subproblem in enumerate(self.subproblems):
+                self.run_subproblem_optimization(X, subproblem,
+                                                 xl=self.xl_array[j],
+                                                 xu=self.xu_array[j])
 
             # Update scaled inconsistency vector q (NOT c)
             q_previous = np.copy(self.q_current)
