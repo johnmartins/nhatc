@@ -72,6 +72,7 @@ class Coordinator:
         self.xl_array = []
         self.xu_array = []
         self.var_name_map = {}
+        self.F_star = []
 
     def set_variables(self, variables: list[ATCVariable]):
         self.variables = variables
@@ -157,6 +158,7 @@ class Coordinator:
 
     def set_subproblems(self, subproblems: list[SubProblem]):
         self.subproblems = subproblems
+        self.F_star = [None] * len(self.subproblems)
 
     def get_variables(self, var_names: list[str]):
         vars = []
@@ -214,6 +216,8 @@ class Coordinator:
                              f"unexpectadly in subproblem {self.subsystem_in_evaluation}"
                              f"\nReason: {res.message}")
 
+        self.F_star[self.subsystem_in_evaluation] = res.fun
+
     def optimize(self, i_max_outerloop: 10, initial_targets):
         """
 
@@ -242,9 +246,12 @@ class Coordinator:
 
             epsilon = norm(q_previous - self.q_current)
             if epsilon < convergence_threshold:
-                print(f'{self.q_current}')
-                print(f'Epsilon = {epsilon}')
-                print(f"Convergence achieved after {iteration+1} iterations.")
+                with np.printoptions(precision=1, suppress=True):
+                    print(f'{self.q_current}')
+                    print(f'Epsilon = {epsilon}')
+                    print(f"Convergence achieved after {iteration+1} iterations.")
+                    print(f'X* = {self.X}')
+                    print(f'F* = {self.F_star}')
                 return
 
             iteration += 1
