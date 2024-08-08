@@ -178,7 +178,7 @@ class Coordinator:
 
         return obj + penalty_result
 
-    def run_subproblem_optimization(self, subproblem):
+    def run_subproblem_optimization(self, subproblem, method):
         self.function_in_evaluation = subproblem.objective_function
         self.XD_indices = []
         self.XC_indices = []
@@ -203,7 +203,7 @@ class Coordinator:
             constraints.append({'type': 'eq', 'fun': c_eq})
 
         res = minimize(self.evaluate_subproblem, self.X[self.XD_indices],
-                       method=None, # Let scipy decide, depending on presence of bounds and constraints
+                       method=method, # Let scipy decide, depending on presence of bounds and constraints
                        bounds=bounds, # Tuple of (min, max)
                        constraints=constraints) # List of dicts
 
@@ -218,8 +218,13 @@ class Coordinator:
 
         self.F_star[self.subsystem_in_evaluation] = res.fun
 
-    def optimize(self, i_max_outerloop: 10, initial_targets, beta=2.2, gamma=0.25, convergence_threshold=0.0001):
+    def optimize(self, i_max_outerloop: 10, initial_targets,
+                 beta=2.2,
+                 gamma=0.25,
+                 convergence_threshold=0.0001,
+                 method=None):
         """
+        :param method: Optimization method. Defaults to auto. COBYLA is a bit sensitive.
         :param convergence_threshold: Difference between error between iterations before convergence
         :param gamma: gamma is typically set to about 0.25
         :param beta: Typically, 2 < beta < 3  (Tosseram, Etman, and Rooda, 2008)
@@ -245,13 +250,13 @@ class Coordinator:
 
             for j, subproblem in enumerate(self.subproblems):
                 self.subsystem_in_evaluation = j
-                self.run_subproblem_optimization(subproblem)
+                self.run_subproblem_optimization(subproblem, method)
 
             self.update_weights(self.q_current, q_previous)
 
             epsilon = norm(q_previous - self.q_current)
             if epsilon < convergence_threshold:
-                with np.printoptions(precision=1, suppress=True):
+                with np.printoptions(precision=3, suppress=True):
                     print(f'{self.q_current}')
                     print(f'Epsilon = {epsilon}')
                     print(f"Convergence achieved after {iteration+1} iterations.")
