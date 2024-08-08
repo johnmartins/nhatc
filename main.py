@@ -43,10 +43,8 @@ def sp1_objective(X):
     b1 = X[3]
     a1 = np.log(X[0]) + np.log(X[1]) + np.log(X[3])
 
-
     f = u1 + v + a1 + b1
     y = a1
-    print(f'{u1} {v} {b1} {a1}')
     return f, y
 
 
@@ -80,6 +78,12 @@ sp2.set_objective(sp2_objective)
 sp2.set_ineqs([sp2_ieq])
 
 
-x0 = np.array([8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0])
+x0 = np.array([9.0] * 8)
 coordinator.set_subproblems([sp1, sp2])
-coordinator.optimize(100, x0)
+X_star, F_star = coordinator.optimize(100, x0, beta=2.5)
+
+
+print("Verification against objectives:")
+print(type(X_star))
+print(f'Objective 1 F* = {sp1_objective(X_star)[0]}')
+print(f'Objective 2 F* = {sp2_objective(X_star)[0]}')

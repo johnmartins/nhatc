@@ -135,7 +135,6 @@ class Coordinator:
 
     def update_weights(self, q_current, q_previous):
         """
-        Typically, 2 < beta < 3 and gamma = 0.25 (Tosseram, Etman, and Rooda, 2008)
         :param q_current: current scaled discrepancy vector
         :param q_previous: previous scaled discrepancy vector
         :return:
@@ -180,8 +179,6 @@ class Coordinator:
         return obj + penalty_result
 
     def run_subproblem_optimization(self, subproblem):
-        print(f'Evaluating subproblem j = {self.subsystem_in_evaluation}')
-
         self.function_in_evaluation = subproblem.objective_function
         self.XD_indices = []
         self.XC_indices = []
@@ -212,30 +209,38 @@ class Coordinator:
 
         self.q_current = self.get_updated_inconsistency_vector()
 
+        if "Inequality constraints incompatible" in res.message:
+            res.message += "\nTry reducing the value of the optimization parameter BETA"
+
         assert res.success, (f"Optimization process failed "
                              f"unexpectadly in subproblem {self.subsystem_in_evaluation}"
                              f"\nReason: {res.message}")
 
         self.F_star[self.subsystem_in_evaluation] = res.fun
 
-    def optimize(self, i_max_outerloop: 10, initial_targets):
+    def optimize(self, i_max_outerloop: 10, initial_targets, beta=2.2, gamma=0.25, convergence_threshold=0.0001):
         """
-
+        :param convergence_threshold: Difference between error between iterations before convergence
+        :param gamma: gamma is typically set to about 0.25
+        :param beta: Typically, 2 < beta < 3  (Tosseram, Etman, and Rooda, 2008)
         :param initial_targets: Initial guess for reasonable design
         :param i_max_outerloop: Maximum iterations of outer loop
         :return:
         """
+        # Setup parameters
+        self.beta = beta
+        self.gamma = gamma
+        convergence_threshold = convergence_threshold
+        max_iterations = i_max_outerloop
+
         # Initial targets and inconsistencies
         self.X = initial_targets
         assert self.X.size == len(self.variables), "Initial guess x0 does not match specified variable vector size"
         self.q_current = np.zeros(self.n_q)
 
-        convergence_threshold = 0.0001
-        max_iterations = i_max_outerloop
         iteration = 0
 
         while iteration < max_iterations-1:
-            print(f"Outer iteration {iteration}")
             q_previous = np.copy(self.q_current)
 
             for j, subproblem in enumerate(self.subproblems):
@@ -252,9 +257,10 @@ class Coordinator:
                     print(f"Convergence achieved after {iteration+1} iterations.")
                     print(f'X* = {self.X}')
                     print(f'F* = {self.F_star}')
-                return
+                return self.X, self.F_star
 
             iteration += 1
 
         print(f"Failed to converge after {iteration+1} iterations")
+        return self.X, self.F_star
 
