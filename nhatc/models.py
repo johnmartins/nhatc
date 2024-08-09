@@ -241,7 +241,7 @@ class Coordinator:
                            'maxfeval': NI
                        }) # List of dicts
 
-        print(f"Minimized with {self.inner_iteration} inner iterations")
+        # print(f"Minimized with {self.inner_iteration} inner iterations")
 
         self.q_current = self.get_updated_inconsistency_vector()
         # print(res)
