@@ -4,7 +4,24 @@ from numpy import inf
 from numpy.linalg import norm
 import numpy as np
 
+from pymoo.problems.functional import FunctionalProblem
+
+"""
+from pymoo.algorithms.moo.nsga2 import NSGA2
+from pymoo.algorithms.soo.nonconvex.pattern import PatternSearch
+from pymoo.algorithms.soo.nonconvex.cmaes import CMAES
+from pymoo.algorithms.soo.nonconvex.pso import PSO
+
+from pymoo.operators.crossover.sbx import SBX
+from pymoo.operators.mutation.pm import PM
+from pymoo.operators.sampling.rnd import FloatRandomSampling
+from pymoo.termination import get_termination
+from pymoo.termination.default import DefaultSingleObjectiveTermination
+from pymoo.optimize import minimize
+"""
+
 from scipy.optimize import minimize
+
 
 
 class SubProblem:
@@ -51,14 +68,14 @@ class Coordinator:
 
     def __init__(self):
         self.variables: list[ATCVariable] = []     # Array of variables
-        self.subproblems = []
-        self.beta = 2.2
-        self.gamma = 0.25
+        self.subproblems: list[SubProblem] = []
+        self.beta: float = 2.2
+        self.gamma: float = 0.25
 
         # Runtime variables
         self.X = np.array([], dtype=float)
-        self.XD_indices = []
-        self.XC_indices = []
+        self.XD_indices: list[int] = []
+        self.XC_indices: list[int] = []
         self.n_vars = 0   # Number of variables
         self.n_q = 0
         self.I = []
@@ -66,8 +83,8 @@ class Coordinator:
         self.scaling_vector = np.array([], dtype=float)      # s
         self.linear_weights = np.array([], dtype=float)      # v
         self.quadratic_weights = np.array([], dtype=float)   # w
-        self.subsystem_in_evaluation = -1
-        self.function_in_evaluation = None
+        self.subproblem_in_evaluation: Optional[SubProblem] = None
+        self.function_in_evaluation: Optional[Callable] = None
         self.q_current = np.array([], dtype=float)
         self.xl_array = []
         self.xu_array = []
@@ -126,26 +143,24 @@ class Coordinator:
     def get_updated_inconsistency_vector(self):
         """
         Returns the scaled inconsistency vector q
-        :param X: current values of X
         :return:
         """
         x_term = (self.X[self.I] - self.X[self.I_prime])
         scale_term = (self.scaling_vector[self.I] + self.scaling_vector[self.I_prime])/2
         return x_term / scale_term
 
-    def update_weights(self, q_current, q_previous):
+    def update_weights(self, q_previous):
         """
-        :param q_current: current scaled discrepancy vector
         :param q_previous: previous scaled discrepancy vector
         :return:
         """
         v = self.linear_weights
         w = self.quadratic_weights
 
-        self.linear_weights = v + 2 * w * w * q_current
+        self.linear_weights = v + 2 * w * w * self.q_current
 
         for i in range(0, len(w)):
-            if np.abs(q_current[i]) <= self.gamma * np.abs(q_previous[i]):
+            if np.abs(self.q_current[i]) <= self.gamma * np.abs(q_previous[i]):
                 self.quadratic_weights[i] = w[i]
             else:
                 self.quadratic_weights[i] = self.beta * w[i]
@@ -168,20 +183,27 @@ class Coordinator:
 
     def evaluate_subproblem(self, XD):
         self.X[self.XD_indices] = XD
-
         obj, y = self.function_in_evaluation(self.X)
+
         self.X[self.XC_indices] = y
         penalty_result = self.penalty_function()
-        # print(f'subproblem {self.subsystem_in_evaluation} returns y = {y}')
-        # print(self.X)
-        # print(f'Penalty = {self.q_current}')
 
         return obj + penalty_result
 
-    def run_subproblem_optimization(self, subproblem, method):
+    def prepare_constraint(self, func):
+        def wrapper(*args, **kwargs):
+            return func(self.X)
+
+        return wrapper
+
+    def run_subproblem_optimization(self, subproblem, method, NI=100):
         self.function_in_evaluation = subproblem.objective_function
         self.XD_indices = []
         self.XC_indices = []
+
+        if subproblem.index > len(self.subproblems) - 1:
+            raise ValueError('Subproblem index higher than expected. Check subproblem indices.')
+
         bounds = []
 
         for var in self.variables:
@@ -195,6 +217,8 @@ class Coordinator:
             else:
                 continue
 
+
+
         constraints = []
         for c_ineq in subproblem.inequality_constraints:
             constraints.append({'type': 'ineq', 'fun': c_ineq})
@@ -202,21 +226,22 @@ class Coordinator:
         for c_eq in subproblem.equality_constraints:
             constraints.append({'type': 'eq', 'fun': c_eq})
 
-        res = minimize(self.evaluate_subproblem, self.X[self.XD_indices],
+        x0 = self.X[self.XD_indices]
+
+        res = minimize(self.evaluate_subproblem, x0,
                        method=method, # Let scipy decide, depending on presence of bounds and constraints
                        bounds=bounds, # Tuple of (min, max)
                        constraints=constraints) # List of dicts
 
         self.q_current = self.get_updated_inconsistency_vector()
+        # print(res)
+        self.F_star[self.subproblem_in_evaluation.index] = res.fun
+        self.X[self.XD_indices] = res.x
 
-        if "Inequality constraints incompatible" in res.message:
-            res.message += "\nTry reducing the value of the optimization parameter BETA"
+        # print(f"before: {self.X}")
 
-        assert res.success, (f"Optimization process failed "
-                             f"unexpectadly in subproblem {self.subsystem_in_evaluation}"
-                             f"\nReason: {res.message}")
-
-        self.F_star[self.subsystem_in_evaluation] = res.fun
+        # print(f"after: {self.X}")
+        # print(f'{self.X} yields {res.F}')
 
     def optimize(self, i_max_outerloop: 10, initial_targets,
                  beta=2.2,
@@ -244,17 +269,19 @@ class Coordinator:
         self.q_current = np.zeros(self.n_q)
 
         iteration = 0
+        epsilon = 0
 
         while iteration < max_iterations-1:
             q_previous = np.copy(self.q_current)
 
             for j, subproblem in enumerate(self.subproblems):
-                self.subsystem_in_evaluation = j
+                self.subproblem_in_evaluation = subproblem
                 self.run_subproblem_optimization(subproblem, method)
 
-            self.update_weights(self.q_current, q_previous)
+            self.update_weights(q_previous)
 
             epsilon = norm(q_previous - self.q_current)
+            print(epsilon)
             if epsilon < convergence_threshold:
                 with np.printoptions(precision=3, suppress=True):
                     print(f'{self.q_current}')
@@ -267,5 +294,6 @@ class Coordinator:
             iteration += 1
 
         print(f"Failed to converge after {iteration+1} iterations")
+        print(f'Epsilon = {epsilon}')
         return self.X, self.F_star
 

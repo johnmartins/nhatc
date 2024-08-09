@@ -1,27 +1,6 @@
 import numpy as np
 
 from nhatc.models import ATCVariable, Coordinator, SubProblem
-from numpy.linalg import norm
-
-"""
-def sp1_analysis(get_variables):
-    u1, v, a1, b1 = get_variables('u1', 'v1', 'b1')
-
-    obj = u1 + v + a1 + b1
-    y = np.log(u1) + np.log(v) + np.log(b1)
-
-    return obj, y
-
-def sp2_analysis():
-    u2 = 0
-    w = 0
-    a2 = 0
-
-    obj = 0
-    y = np.pow(u2, -1) + np.pow(w, -1) + np.pow(a2, -1)
-
-    return obj, y
-"""
 
 
 coordinator = Coordinator()
@@ -38,25 +17,23 @@ coordinator.set_variables([
 
 
 def sp1_objective(X):
-    u1 = X[0]
-    v = X[1]
-    b1 = X[3]
-    a1 = np.log(X[0]) + np.log(X[1]) + np.log(X[3])
+    u1, v, b1 = X[[0, 1, 3]]
+    a1 = np.log(u1) + np.log(v) + np.log(b1)
 
     f = u1 + v + a1 + b1
     y = a1
     return f, y
 
 
+@coordinator.prepare_constraint
 def sp1_ieq(X):
+    u1, v, b1 = X[[0, 1, 3]]
     # Prevent logarithmic runaway
-    return 10 - np.log(X[0]) + np.log(X[1]) + np.log(X[2])
+    return (np.log(u1) + np.log(v) + np.log(b1)) - 10
 
 
 def sp2_objective(X):
-    u2 = X[4]
-    w = X[5]
-    a2 = X[6]
+    u2, w, a2 = X[[4, 5, 6]]
     b2 = np.pow(u2, -1) + np.pow(w, -1) + np.pow(a2, -1)
 
     f = 0
@@ -64,11 +41,12 @@ def sp2_objective(X):
     return f, y
 
 
-def sp2_ieq(X,):
-    b2 = np.pow(X[0], -1) + np.pow(X[1], -1) + np.pow(X[2], -1)
-    w = X[1]
-    return 10 + b2 - w
-
+@coordinator.prepare_constraint
+def sp2_ieq(X):
+    u2, w, a2 = X[[4, 5, 6]]
+    b2 = np.pow(u2, -1) + np.pow(w, -1) + np.pow(a2, -1)
+    # return 10 + b2 - w
+    return w+b2-10
 
 sp1 = SubProblem(0)
 sp1.set_objective(sp1_objective)
@@ -77,11 +55,11 @@ sp2 = SubProblem(1)
 sp2.set_objective(sp2_objective)
 sp2.set_ineqs([sp2_ieq])
 
-
-x0 = np.array([9.0] * 8)
+x0 = np.array(np.random.uniform(low=0, high=10, size=8), dtype=float)
+# x0 = np.ones(8) * 8
 coordinator.set_subproblems([sp1, sp2])
-X_star, F_star = coordinator.optimize(100, x0, beta=2.5)
-
+X_star, F_star = coordinator.optimize(50, x0, beta=2, gamma=0.4,
+                                      convergence_threshold=1e-8)
 
 print("Verification against objectives:")
 print(type(X_star))
