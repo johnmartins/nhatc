@@ -66,11 +66,12 @@ class ATCVariable:
 
 class Coordinator:
 
-    def __init__(self):
+    def __init__(self, verbose: bool = False):
         self.variables: list[ATCVariable] = []     # Array of variables
         self.subproblems: list[SubProblem] = []
         self.beta: float = 2.2
         self.gamma: float = 0.25
+        self.verbose = verbose
 
         # Runtime variables
         self.X = np.array([], dtype=float)
@@ -90,6 +91,7 @@ class Coordinator:
         self.xu_array = []
         self.var_name_map = {}
         self.F_star = []
+        self.inner_iteration = 0
 
     def set_variables(self, variables: list[ATCVariable]):
         self.variables = variables
@@ -188,6 +190,8 @@ class Coordinator:
         self.X[self.XC_indices] = y
         penalty_result = self.penalty_function()
 
+        self.inner_iteration += 1
+
         return obj + penalty_result
 
     def prepare_constraint(self, func):
@@ -196,7 +200,7 @@ class Coordinator:
 
         return wrapper
 
-    def run_subproblem_optimization(self, subproblem, method, NI=100):
+    def run_subproblem_optimization(self, subproblem, NI):
         self.function_in_evaluation = subproblem.objective_function
         self.XD_indices = []
         self.XC_indices = []
@@ -217,8 +221,6 @@ class Coordinator:
             else:
                 continue
 
-
-
         constraints = []
         for c_ineq in subproblem.inequality_constraints:
             constraints.append({'type': 'ineq', 'fun': c_ineq})
@@ -228,10 +230,18 @@ class Coordinator:
 
         x0 = self.X[self.XD_indices]
 
+        self.inner_iteration = 0
+
         res = minimize(self.evaluate_subproblem, x0,
-                       method=method, # Let scipy decide, depending on presence of bounds and constraints
+                       method='SLSQP', # Let scipy decide, depending on presence of bounds and constraints
                        bounds=bounds, # Tuple of (min, max)
-                       constraints=constraints) # List of dicts
+                       constraints=constraints,
+                       options={
+                           'maxiter': NI,
+                           'maxfeval': NI
+                       }) # List of dicts
+
+        print(f"Minimized with {self.inner_iteration} inner iterations")
 
         self.q_current = self.get_updated_inconsistency_vector()
         # print(res)
@@ -243,18 +253,18 @@ class Coordinator:
         # print(f"after: {self.X}")
         # print(f'{self.X} yields {res.F}')
 
-    def optimize(self, i_max_outerloop: 10, initial_targets,
+    def optimize(self, i_max_outerloop: 50, initial_targets,
                  beta=2.2,
                  gamma=0.25,
                  convergence_threshold=0.0001,
-                 method=None):
+                 NI=20):
         """
-        :param method: Optimization method. Defaults to auto. COBYLA is a bit sensitive.
+        :param NI: Max number of inner iterations (subproblem evals) per outer loop
         :param convergence_threshold: Difference between error between iterations before convergence
         :param gamma: gamma is typically set to about 0.25
         :param beta: Typically, 2 < beta < 3  (Tosseram, Etman, and Rooda, 2008)
         :param initial_targets: Initial guess for reasonable design
-        :param i_max_outerloop: Maximum iterations of outer loop
+        :param i_max_outerloop: Maximum iterations of outer loop (NO)
         :return:
         """
         # Setup parameters
@@ -276,24 +286,25 @@ class Coordinator:
 
             for j, subproblem in enumerate(self.subproblems):
                 self.subproblem_in_evaluation = subproblem
-                self.run_subproblem_optimization(subproblem, method)
+                self.run_subproblem_optimization(subproblem, NI)
 
             self.update_weights(q_previous)
 
             epsilon = norm(q_previous - self.q_current)
-            print(epsilon)
+            # print(epsilon)
             if epsilon < convergence_threshold:
-                with np.printoptions(precision=3, suppress=True):
-                    print(f'{self.q_current}')
-                    print(f'Epsilon = {epsilon}')
-                    print(f"Convergence achieved after {iteration+1} iterations.")
-                    print(f'X* = {self.X}')
-                    print(f'F* = {self.F_star}')
-                return self.X, self.F_star
+                if self.verbose:
+                    with np.printoptions(precision=3, suppress=True):
+                        print(f'{self.q_current}')
+                        print(f'Epsilon = {epsilon}')
+                        print(f"Convergence achieved after {iteration+1} iterations.")
+                        print(f'X* = {self.X}')
+                        print(f'F* = {self.F_star}')
+                return self.X, self.F_star, epsilon
 
             iteration += 1
 
         print(f"Failed to converge after {iteration+1} iterations")
         print(f'Epsilon = {epsilon}')
-        return self.X, self.F_star
+        return self.X, self.F_star, epsilon
 

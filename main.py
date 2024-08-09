@@ -3,7 +3,7 @@ import numpy as np
 from nhatc.models import ATCVariable, Coordinator, SubProblem
 
 
-coordinator = Coordinator()
+coordinator = Coordinator(verbose = False)
 coordinator.set_variables([
     ATCVariable('u1', 0, 0, False, [4], 0, 10),
     ATCVariable('v', 1, 0, False, [], 0, 10),
@@ -45,8 +45,9 @@ def sp2_objective(X):
 def sp2_ieq(X):
     u2, w, a2 = X[[4, 5, 6]]
     b2 = np.pow(u2, -1) + np.pow(w, -1) + np.pow(a2, -1)
-    # return 10 + b2 - w
-    return w+b2-10
+    return 10 + b2 - w
+    # return w+b2-10
+
 
 sp1 = SubProblem(0)
 sp1.set_objective(sp1_objective)
@@ -55,13 +56,27 @@ sp2 = SubProblem(1)
 sp2.set_objective(sp2_objective)
 sp2.set_ineqs([sp2_ieq])
 
-x0 = np.array(np.random.uniform(low=0, high=10, size=8), dtype=float)
-# x0 = np.ones(8) * 8
-coordinator.set_subproblems([sp1, sp2])
-X_star, F_star = coordinator.optimize(50, x0, beta=2, gamma=0.4,
-                                      convergence_threshold=1e-8)
 
+coordinator.set_subproblems([sp1, sp2])
+F_star = [np.inf, 0]
+attempt = 0
+epsilon = 1
+
+while F_star[0] > 10 or epsilon > 1e-8:
+    attempt += 1
+    x0 = np.array(np.random.uniform(low=0, high=10, size=8), dtype=float)
+    X_star, F_star, epsilon = coordinator.optimize(60, x0, beta=1, gamma=0.25,
+                                          convergence_threshold=1e-12, NI=20)
+
+    if attempt > 10000:
+        print('Failed to reach target after 1000 attempts')
+        break
+
+
+print(f'Reached F_star target after {attempt} attempts')
 print("Verification against objectives:")
-print(type(X_star))
 print(f'Objective 1 F* = {sp1_objective(X_star)[0]}')
 print(f'Objective 2 F* = {sp2_objective(X_star)[0]}')
+print(f'Epsilon = {epsilon} ')
+print(F_star)
+print(X_star)
