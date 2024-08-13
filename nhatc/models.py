@@ -64,6 +64,15 @@ class ATCVariable:
         self.ub = ub
 
 
+class Result:
+    def __init__(self, successful_convergence, epsilon, epsilon_diff, f_star, x_star):
+        self.successful_convergence: bool = successful_convergence
+        self.epsilon: float = epsilon
+        self.epsilon_diff: float = epsilon_diff
+        self.f_star = f_star
+        self.x_star = x_star
+
+
 class Coordinator:
 
     def __init__(self, verbose: bool = False):
@@ -92,6 +101,15 @@ class Coordinator:
         self.var_name_map = {}
         self.F_star = []
         self.inner_iteration = 0
+
+    def get_random_x0(self):
+        r = np.random.rand(len(self.variables))
+        x0_list = []
+
+        for i, var in enumerate(self.variables):
+            x0_list.append(r[i] * (var.ub - var.lb) + var.lb)
+
+        return np.array(x0_list)
 
     def set_variables(self, variables: list[ATCVariable]):
         self.variables = variables
@@ -184,6 +202,7 @@ class Coordinator:
         return vars
 
     def evaluate_subproblem(self, XD):
+        # print(XD)
         self.X[self.XD_indices] = XD
         obj, y = self.function_in_evaluation(self.X)
 
@@ -192,7 +211,11 @@ class Coordinator:
 
         self.inner_iteration += 1
 
-        return obj + penalty_result
+        total = obj + penalty_result
+
+        # print(f'{obj} {penalty_result} {total}')
+
+        return total
 
     def prepare_constraint(self, func):
         def wrapper(*args, **kwargs):
@@ -200,7 +223,7 @@ class Coordinator:
 
         return wrapper
 
-    def run_subproblem_optimization(self, subproblem, NI):
+    def run_subproblem_optimization(self, subproblem, NI, method):
         self.function_in_evaluation = subproblem.objective_function
         self.XD_indices = []
         self.XC_indices = []
@@ -232,32 +255,30 @@ class Coordinator:
 
         self.inner_iteration = 0
 
+        # Print hessian?
         res = minimize(self.evaluate_subproblem, x0,
-                       method='SLSQP', # Let scipy decide, depending on presence of bounds and constraints
+                       method=method, # Let scipy decide, depending on presence of bounds and constraints
                        bounds=bounds, # Tuple of (min, max)
                        constraints=constraints,
+                       tol=1e-12,
                        options={
                            'maxiter': NI,
-                           'maxfeval': NI
+                           'maxfun': NI
                        }) # List of dicts
 
-        # print(f"Minimized with {self.inner_iteration} inner iterations")
+        if self.verbose:
+            print(f"Minimized SP{subproblem.index} with {self.inner_iteration} inner iterations")
 
         self.q_current = self.get_updated_inconsistency_vector()
-        # print(res)
-        self.F_star[self.subproblem_in_evaluation.index] = res.fun
         self.X[self.XD_indices] = res.x
-
-        # print(f"before: {self.X}")
-
-        # print(f"after: {self.X}")
-        # print(f'{self.X} yields {res.F}')
+        self.F_star[self.subproblem_in_evaluation.index] = self.subproblem_in_evaluation.objective_function(self.X)
 
     def optimize(self, i_max_outerloop: 50, initial_targets,
                  beta=2.2,
                  gamma=0.25,
                  convergence_threshold=0.0001,
-                 NI=20):
+                 NI=60,
+                 method: str = 'slsqp') -> Result:
         """
         :param NI: Max number of inner iterations (subproblem evals) per outer loop
         :param convergence_threshold: Difference between error between iterations before convergence
@@ -280,19 +301,23 @@ class Coordinator:
 
         iteration = 0
         epsilon = 0
+        epsilon_diff = -1
 
         while iteration < max_iterations-1:
             q_previous = np.copy(self.q_current)
 
             for j, subproblem in enumerate(self.subproblems):
                 self.subproblem_in_evaluation = subproblem
-                self.run_subproblem_optimization(subproblem, NI)
+                self.run_subproblem_optimization(subproblem, NI, method)
 
             self.update_weights(q_previous)
 
-            epsilon = norm(q_previous - self.q_current)
-            # print(epsilon)
-            if epsilon < convergence_threshold:
+            # Difference between this inner loop iteration and the previous
+            epsilon_diff = norm(q_previous - self.q_current)
+            # Total discrepancy between coupled vars in this loop iteration
+            epsilon = norm(self.q_current)
+
+            if epsilon_diff < convergence_threshold and epsilon < convergence_threshold:
                 if self.verbose:
                     with np.printoptions(precision=3, suppress=True):
                         print(f'{self.q_current}')
@@ -300,11 +325,11 @@ class Coordinator:
                         print(f"Convergence achieved after {iteration+1} iterations.")
                         print(f'X* = {self.X}')
                         print(f'F* = {self.F_star}')
-                return self.X, self.F_star, epsilon
+                return Result(True, epsilon, epsilon_diff, self.F_star, self.X)
 
             iteration += 1
 
         print(f"Failed to converge after {iteration+1} iterations")
         print(f'Epsilon = {epsilon}')
-        return self.X, self.F_star, epsilon
+        return Result(False, epsilon, epsilon_diff, self.F_star, self.X)
 

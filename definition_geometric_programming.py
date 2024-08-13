@@ -6,7 +6,7 @@ from numpy.linalg import norm
 lb = 1e-6
 ub = 1e+6
 
-coordinator = Coordinator()
+coordinator = Coordinator(verbose=True)
 coordinator.set_variables([
     ATCVariable('z3_1', 0, 0, False, [1], lb, ub),
     ATCVariable('z3_2', 1, 1, True, [0], lb, ub),
@@ -27,39 +27,35 @@ coordinator.set_variables([
 
 
 def sp1_objective(X):
-    print('SP1')
     z3, z4, z5, z6, z7 = X[[0, 2, 3, 4, 6]]
 
-    z1 = np.sqrt(np.pow(z3, 2) + np.pow(z4, -2) + np.pow(z5, 2))
-    z2 = np.sqrt(np.pow(z5, 2) + np.pow(z6, 2) + np.pow(z7, 2))
+    # z1 = np.sqrt(np.pow(z3, 2) + np.pow(z4, -2) + np.pow(z5, 2))
+    # z2 = np.sqrt(np.pow(z5, 2) + np.pow(z6, 2) + np.pow(z7, 2))
+    # res = np.pow(z1, 2) + np.pow(z2, 2)
+    res = (np.pow(z3, 2) + np.pow(z6, -2) + np.pow(z4, -2)
+           + 2 * np.pow(z5, 2) + np.pow(z7, 2))
 
-    f = np.pow(z1, 2) + np.pow(z2, 2)
+    f = res
     y = []
-    print(f)
     return f, y
 
 
 @coordinator.prepare_constraint
 def sp1_ieq_1(X):
-    print('SP1 IEQ1')
     z3, z4, z5, z6, z7 = X[[0, 2, 3, 4, 6]]
-    res = np.pow(z3, -2) + np.pow(z4, 2) - np.pow(z5, 2)
+    res = - np.pow(z3, -2) - np.pow(z4, 2) + np.pow(z5, 2)
 
-    print(res)
     return res
 
 
 @coordinator.prepare_constraint
 def sp1_ieq_2(X):
-    print('SP1 IEQ2')
     z3, z4, z5, z6, z7 = X[[0, 2, 3, 4, 6]]
-    res = np.pow(z5, 2) + np.pow(z6, -2) - np.pow(z7, 2)
-    print(res)
+    res = - np.pow(z5, 2) - np.pow(z6, -2) + np.pow(z7, 2)
     return res
 
 
 def sp2_objective(X):
-    print('SP2')
     z8, z9, z10, z11 = X[[7,8,9,10]]
     z3 = np.sqrt(np.pow(z8, 2) + np.pow(z9, -2)
                  + np.pow(z10, -2) + np.pow(z11, 2))
@@ -72,43 +68,35 @@ def sp2_objective(X):
 
 @coordinator.prepare_constraint
 def sp2_ieq_1(X):
-    print('SP2 IEQ1')
     z8, z9, z10, z11 = X[[7, 8, 9, 10]]
-    return np.pow(z8, 2) + np.pow(z9, 2) - np.pow(z11, 2)
+    return - np.pow(z8, 2) - np.pow(z9, 2) + np.pow(z11, 2)
 
 
 @coordinator.prepare_constraint
 def sp2_ieq_2(X):
-    print('SP2 IEQ2')
     z8, z9, z10, z11 = X[[7, 8, 9, 10]]
-    return np.pow(z8, -2) + np.pow(z10, 2) - np.pow(z11, 2)
+    return - np.pow(z8, -2) - np.pow(z10, 2) + np.pow(z11, 2)
 
 
 def sp3_objective(X):
-    print('SP3')
     z11, z12, z13, z14 = X[[11,12,13,14]]
     z6_3 = np.sqrt(np.pow(z11, 2) + np.pow(z12, 2) + np.pow(z13, 2)
                    + np.pow(z14, 2))
     f = 0
     y = z6_3
-    print(f'y = {y}')
     return f, y
 
 
 @coordinator.prepare_constraint
 def sp3_ieq_1(X):
-    print('SP3 IEQ1')
     z11, z12, z13, z14 = X[[11, 12, 13, 14]]
-    return np.pow(z11, 2) + np.pow(z12, -2) - np.pow(z13, 2)
+    return - np.pow(z11, 2) - np.pow(z12, -2) + np.pow(z13, 2)
 
 
 @coordinator.prepare_constraint
 def sp3_ieq_2(X):
-    print('SP3 IEQ2')
     z11, z12, z13, z14 = X[[11, 12, 13, 14]]
-    res = np.pow(z11, 2) + np.pow(z12, 2) - np.pow(z14, 2)
-    print(X)
-    print(res)
+    res = - np.pow(z11, 2) - np.pow(z12, 2) + np.pow(z14, 2)
     return res
 
 
@@ -124,12 +112,13 @@ sp3.set_ineqs([sp3_ieq_1, sp3_ieq_2])
 
 x0 = np.array(np.random.uniform(low=lb, high=ub, size=15), dtype=float)
 coordinator.set_subproblems([sp1, sp2, sp3])
-X_star, F_star = coordinator.optimize(10000, x0, beta=1.2, gamma=0.25, convergence_threshold=1e-9, method='COBYLA')
+X_star, F_star, epsilon = coordinator.optimize(10000, x0, beta=2.0, gamma=0.4, convergence_threshold=1e-12)
 
 
 print("Verification against objectives:")
 print(f'Objective 1 F* = {sp1_objective(X_star)[0]}')
 print(f'Objective 2 F* = {sp2_objective(X_star)[0]}')
 print(f'Objective 3 F* = {sp3_objective(X_star)[0]}')
-
+print(f'Epsilon = {epsilon}')
 print(X_star)
+
