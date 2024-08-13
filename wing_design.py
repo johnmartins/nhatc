@@ -82,7 +82,7 @@ while F_star[0] > 20 or F_star[0] < 0 or epsilon > 1e-8 or np.isnan(F_star[0]):
     res = coordinator.optimize(100, x0,
                                beta=2.0,
                                gamma=0.25,
-                               convergence_threshold=1e-10,
+                               convergence_threshold=1e-9,
                                NI=60,
                                method='nelder-mead')
 
