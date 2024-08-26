@@ -4,22 +4,6 @@ from numpy import inf
 from numpy.linalg import norm
 import numpy as np
 
-from pymoo.problems.functional import FunctionalProblem
-
-"""
-from pymoo.algorithms.moo.nsga2 import NSGA2
-from pymoo.algorithms.soo.nonconvex.pattern import PatternSearch
-from pymoo.algorithms.soo.nonconvex.cmaes import CMAES
-from pymoo.algorithms.soo.nonconvex.pso import PSO
-
-from pymoo.operators.crossover.sbx import SBX
-from pymoo.operators.mutation.pm import PM
-from pymoo.operators.sampling.rnd import FloatRandomSampling
-from pymoo.termination import get_termination
-from pymoo.termination.default import DefaultSingleObjectiveTermination
-from pymoo.optimize import minimize
-"""
-
 from scipy.optimize import minimize
 
 
