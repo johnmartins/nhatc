@@ -255,7 +255,7 @@ class Coordinator:
 
         self.q_current = self.get_updated_inconsistency_vector()
         self.X[self.XD_indices] = res.x
-        self.F_star[self.subproblem_in_evaluation.index] = self.subproblem_in_evaluation.objective_function(self.X)
+        self.F_star[self.subproblem_in_evaluation.index] = self.subproblem_in_evaluation.objective_function(self.X)[0]
 
     def optimize(self, i_max_outerloop: 50, initial_targets,
                  beta=2.2,

@@ -93,7 +93,7 @@ if res:
         print(f'FAILED to reach convergence after {attempt - 1} attempts')
 
     print("Verification against objectives:")
-    print(f'f* = {res.f_star}')
+    print(f'f* = {res.f_star[0]}')
     print(f'Epsilon = {res.epsilon} ')
 
     print('x*:')
