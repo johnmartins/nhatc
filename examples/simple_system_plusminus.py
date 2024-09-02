@@ -25,6 +25,7 @@ spi_2.index = 1
 spi_2.obj = "0"
 spi_2.variables = {'a': 3, 'w': 5}
 spi_2.couplings = {'b': '(a/2) * w'}
+spi_2.inequality_constraints.append('3 - ( b + w )')
 
 spi_array = [spi_1, spi_2]
 

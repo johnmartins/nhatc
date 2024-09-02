@@ -59,6 +59,17 @@ class DynamicSubProblem(SubProblem):
         # Runtime vars
         self.symbol_table = cexprtk.Symbol_Table({}, {}, add_constants=True)
 
+    def _refresh_symbol_table(self, X):
+        # Set variables, build initial symbol table
+        for v in self.variables:
+            self.symbol_table.variables[v] = X[self.variables[v]]
+
+        # Calculate coupling variables
+        for c in self.couplings:
+            expr = cexprtk.Expression(self.couplings[c], self.symbol_table)
+            value = expr()
+            self.symbol_table.variables[c] = value
+
     def get_ineqs(self):
         return self.inequality_constraints
 

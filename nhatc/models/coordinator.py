@@ -169,9 +169,11 @@ class Coordinator:
         if self.subproblem_in_evaluation.type == SubProblem.TYPE_PROGRAMMATIC:
             def wrapper(*args, **kwargs):
                 return func(self.X)
-        elif self.subproblem_in_evaluation == SubProblem.TYPE_DYNAMIC:
+        elif self.subproblem_in_evaluation.type == SubProblem.TYPE_DYNAMIC:
             def wrapper(*args, **kwargs):
-                return cexprtk.Expression(func, self.subproblem_in_evaluation.symbol_table)
+                self.subproblem_in_evaluation._refresh_symbol_table(self.X)
+                expr = cexprtk.Expression(func, self.subproblem_in_evaluation.symbol_table)
+                return expr()
         else:
             raise ValueError(f'Unknown subproblem type {self.subproblem_in_evaluation.type}.')
 
