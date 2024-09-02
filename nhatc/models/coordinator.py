@@ -1,51 +1,11 @@
 from typing import Callable, Optional
 
-from numpy import inf
 from numpy.linalg import norm
 import numpy as np
-
 from scipy.optimize import minimize
 
-
-
-class SubProblem:
-    def __init__(self, index: int):
-        self.index = index
-        self.objective_function: Optional[Callable] = None
-        self.inequality_constraints: list[Callable] = []
-        self.equality_constraints: list[Callable] = []
-
-    def set_objective(self, function: Callable):
-        self.objective_function = function
-
-    def set_ineqs(self, ineqs: list[Callable]):
-        self.inequality_constraints = ineqs
-
-    def set_eqs(self, eqs: list[Callable]):
-        self.equality_constraints = eqs
-
-
-class ATCVariable:
-
-    def __init__(self, name: str, index: int, subproblem_index: int,
-                 coupled_variable: bool, links: list[int],
-                 lb: -inf, ub: inf):
-        """
-        Variable definition based on Talgorn and Kokkolaras, 2017
-        :param index: For identification
-        :param subproblem_index: index of subproblem this variable belongs to
-        :param coupled_variable: Is this variable sent to another subproblem?
-        :param links: Index of variables that should, after convergence, have the same value as this variable
-        :param lb: lower bound
-        :param ub: upper bound
-        """
-        self.name = name
-        self.index = index
-        self.subproblem_index = subproblem_index
-        self.coupled_variable = coupled_variable
-        self.links = links
-        self.lb = lb
-        self.ub = ub
+from nhatc.models.variables import ATCVariable
+from nhatc.models.problems import SubProblem, ProgrammaticSubProblem, DynamicSubProblem
 
 
 class Result:
@@ -78,7 +38,7 @@ class Coordinator:
         self.linear_weights = np.array([], dtype=float)      # v
         self.quadratic_weights = np.array([], dtype=float)   # w
         self.subproblem_in_evaluation: Optional[SubProblem] = None
-        self.function_in_evaluation: Optional[Callable] = None
+        self.programmatic_function_in_evaluation: Optional[Callable] = None
         self.q_current = np.array([], dtype=float)
         self.xl_array = []
         self.xu_array = []
@@ -186,9 +146,16 @@ class Coordinator:
         return vars
 
     def evaluate_subproblem(self, XD):
-        # print(XD)
         self.X[self.XD_indices] = XD
-        obj, y = self.function_in_evaluation(self.X)
+
+        print(self.X)
+
+        if self.subproblem_in_evaluation.type == SubProblem.TYPE_PROGRAMMATIC:
+            obj, y = self.programmatic_function_in_evaluation(self.X)
+        elif self.subproblem_in_evaluation.type == SubProblem.TYPE_DYNAMIC:
+            obj, y = self.subproblem_in_evaluation.eval(self.X)
+        else:
+            raise ValueError(f'Unknown subproblem type {self.subproblem_in_evaluation.type}.')
 
         self.X[self.XC_indices] = y
         penalty_result = self.penalty_function()
@@ -196,8 +163,6 @@ class Coordinator:
         self.inner_iteration += 1
 
         total = obj + penalty_result
-
-        # print(f'{obj} {penalty_result} {total}')
 
         return total
 
@@ -208,7 +173,9 @@ class Coordinator:
         return wrapper
 
     def run_subproblem_optimization(self, subproblem, NI, method):
-        self.function_in_evaluation = subproblem.objective_function
+        if self.subproblem_in_evaluation.type == SubProblem.TYPE_PROGRAMMATIC:
+            self.programmatic_function_in_evaluation = subproblem.objective_function
+
         self.XD_indices = []
         self.XC_indices = []
 
@@ -255,7 +222,7 @@ class Coordinator:
 
         self.q_current = self.get_updated_inconsistency_vector()
         self.X[self.XD_indices] = res.x
-        self.F_star[self.subproblem_in_evaluation.index] = self.subproblem_in_evaluation.objective_function(self.X)[0]
+        self.F_star[self.subproblem_in_evaluation.index] = self.subproblem_in_evaluation.eval(self.X)[0]
 
     def optimize(self, i_max_outerloop: 50, initial_targets,
                  beta=2.2,

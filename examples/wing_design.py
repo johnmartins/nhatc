@@ -1,6 +1,6 @@
 import numpy as np
 
-from nhatc.models import ATCVariable, Coordinator, SubProblem
+from nhatc import ATCVariable, Coordinator, ProgrammaticSubProblem
 from numpy.linalg import norm
 
 
@@ -57,11 +57,11 @@ def sp3_objective(X):
     return f, y
 
 
-sp1 = SubProblem(0)
+sp1 = ProgrammaticSubProblem(0)
 sp1.set_objective(sp1_objective)
-sp2 = SubProblem(1)
+sp2 = ProgrammaticSubProblem(1)
 sp2.set_objective(sp2_objective)
-sp3 = SubProblem(2)
+sp3 = ProgrammaticSubProblem(2)
 sp3.set_objective(sp3_objective)
 
 coordinator.set_subproblems([sp1, sp2, sp3])
