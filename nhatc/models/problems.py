@@ -36,6 +36,12 @@ class ProgrammaticSubProblem(SubProblem):
     def eval(self, X):
         return self.objective_function(X)
 
+    def get_ineqs(self):
+        return self.inequality_constraints
+
+    def get_eqs(self):
+        return self.equality_constraints
+
 
 class DynamicSubProblem(SubProblem):
 
@@ -47,24 +53,32 @@ class DynamicSubProblem(SubProblem):
         self.ineqs: list[str] = []
         self.couplings: dict[str, str] = {}
 
-        self.inequality_constraints = []
-        self.equality_constraints = []
+        self.inequality_constraints: list[str] = []
+        self.equality_constraints: list[str] = []
+
+        # Runtime vars
+        self.symbol_table = cexprtk.Symbol_Table({}, {}, add_constants=True)
+
+    def get_ineqs(self):
+        return self.inequality_constraints
+
+    def get_eqs(self):
+        return self.equality_constraints
 
     def eval(self, X):
 
         # Set variables, build initial symbol table
-        symbol_table = cexprtk.Symbol_Table({}, {}, add_constants=True)
         for v in self.variables:
-            symbol_table.variables[v] = X[self.variables[v]]
+            self.symbol_table.variables[v] = X[self.variables[v]]
 
         # Calculate coupling variables
         y = []
         for c in self.couplings:
-            expr = cexprtk.Expression(self.couplings[c], symbol_table)
+            expr = cexprtk.Expression(self.couplings[c], self.symbol_table)
             value = expr()
             y.append(value)
-            symbol_table.variables[c] = value
+            self.symbol_table.variables[c] = value
 
         # Calculate objective
-        obj_expr = cexprtk.Expression(self.obj, symbol_table)
+        obj_expr = cexprtk.Expression(self.obj, self.symbol_table)
         return obj_expr(), np.array([y])

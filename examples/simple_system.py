@@ -31,10 +31,17 @@ def sp2_objective(X):
     return f, y
 
 
+def sp2_ineq(X):
+    # g(x) ≥ 0
+    b, w = X[[4, 5]]
+    return 3 - (b + w)  # 3 - ( b + w ) ≥ 0
+
+
 sp1 = ProgrammaticSubProblem(0)
 sp1.set_objective(sp1_objective)
 sp2 = ProgrammaticSubProblem(1)
 sp2.set_objective(sp2_objective)
+sp2.set_ineqs([sp2_ineq])
 
 coordinator.set_subproblems([sp1, sp2])
 F_star = [np.inf, 0]
@@ -56,7 +63,7 @@ while F_star[0] > 20 or F_star[0] < 0 or epsilon > 1e-8 or np.isnan(F_star[0]):
                                gamma=0.25,
                                convergence_threshold=1e-9,
                                NI=60,
-                               method='nelder-mead')
+                               method='slsqp')
 
 if res:
     if res.successful_convergence:

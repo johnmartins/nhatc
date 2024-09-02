@@ -3,6 +3,7 @@ from typing import Callable, Optional
 from numpy.linalg import norm
 import numpy as np
 from scipy.optimize import minimize
+import cexprtk
 
 from nhatc.models.variables import ATCVariable
 from nhatc.models.problems import SubProblem, ProgrammaticSubProblem, DynamicSubProblem
@@ -164,9 +165,15 @@ class Coordinator:
 
         return total
 
-    def prepare_constraint(self, func):
-        def wrapper(*args, **kwargs):
-            return func(self.X)
+    def constraint_wrapper(self, func):
+        if self.subproblem_in_evaluation.type == SubProblem.TYPE_PROGRAMMATIC:
+            def wrapper(*args, **kwargs):
+                return func(self.X)
+        elif self.subproblem_in_evaluation == SubProblem.TYPE_DYNAMIC:
+            def wrapper(*args, **kwargs):
+                return cexprtk.Expression(func, self.subproblem_in_evaluation.symbol_table)
+        else:
+            raise ValueError(f'Unknown subproblem type {self.subproblem_in_evaluation.type}.')
 
         return wrapper
 
@@ -194,17 +201,16 @@ class Coordinator:
                 continue
 
         constraints = []
-        for c_ineq in subproblem.inequality_constraints:
-            constraints.append({'type': 'ineq', 'fun': c_ineq})
+        for c_ineq in subproblem.get_ineqs():
+            constraints.append({'type': 'ineq', 'fun': self.constraint_wrapper(c_ineq)})
 
-        for c_eq in subproblem.equality_constraints:
-            constraints.append({'type': 'eq', 'fun': c_eq})
+        for c_eq in subproblem.get_eqs():
+            constraints.append({'type': 'eq', 'fun': self.constraint_wrapper(c_eq)})
 
         x0 = self.X[self.XD_indices]
 
         self.inner_iteration = 0
 
-        # Print hessian?
         res = minimize(self.evaluate_subproblem, x0,
                        method=method, # Let scipy decide, depending on presence of bounds and constraints
                        bounds=bounds, # Tuple of (min, max)
