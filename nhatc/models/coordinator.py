@@ -148,8 +148,6 @@ class Coordinator:
     def evaluate_subproblem(self, XD):
         self.X[self.XD_indices] = XD
 
-        print(self.X)
-
         if self.subproblem_in_evaluation.type == SubProblem.TYPE_PROGRAMMATIC:
             obj, y = self.programmatic_function_in_evaluation(self.X)
         elif self.subproblem_in_evaluation.type == SubProblem.TYPE_DYNAMIC:

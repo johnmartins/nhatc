@@ -20,7 +20,6 @@ spi_1.obj = "(a + b) / w"
 spi_1.variables = {'b': 1, 'w': 2}
 spi_1.couplings = {'a': 'w + (1/(b^2))'}
 
-
 spi_2 = DynamicSubProblem()
 spi_2.index = 1
 spi_2.obj = "0"
@@ -35,14 +34,16 @@ attempt = 0
 epsilon = 1
 max_attempts = 1
 
-x0 = np.array([6.76911903, 9.46969758, 1.13955465, 6.54515886, 5.03847838, 4.48557725])
+# x0 = np.array([6.76911903, 9.46969758, 1.13955465, 6.54515886, 5.03847838, 4.48557725])
+x0 = coordinator.get_random_x0()
+
 print(f'x0 = \t {x0}')
 res = coordinator.optimize(100, x0,
                            beta=2.0,
                            gamma=0.25,
                            convergence_threshold=1e-9,
                            NI=60,
-                           method='nelder-mead')
+                           method='slsqp')
 
 if res:
     if res.successful_convergence:
