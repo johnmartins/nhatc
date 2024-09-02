@@ -1,7 +1,7 @@
 import numpy as np
 
 from typing import Optional, Callable
-from plusminus import ArithmeticParser
+import cexprtk
 
 
 class SubProblem:
@@ -51,26 +51,20 @@ class DynamicSubProblem(SubProblem):
         self.equality_constraints = []
 
     def eval(self, X):
-        parser = ArithmeticParser()
 
+        # Set variables, build initial symbol table
+        symbol_table = cexprtk.Symbol_Table({}, {}, add_constants=True)
         for v in self.variables:
-            eval_str = f'{v} = {X[self.variables[v]]}'
-            try:
-                parser.evaluate(eval_str)
-            except ZeroDivisionError:
-                eval_str = f'{v} = 9999999999'
-                parser.evaluate(eval_str)
+            symbol_table.variables[v] = X[self.variables[v]]
 
+        # Calculate coupling variables
         y = []
         for c in self.couplings:
-            eval_str = f'{c} = {self.couplings[c]}'
-            try:
-                parser.evaluate(eval_str)
-                y.append(parser.evaluate(self.couplings[c]))
-            except ZeroDivisionError:
-                eval_str = f'{c} = 9999999999'
-                parser.evaluate(eval_str)
-                y.append(9999999999)
+            expr = cexprtk.Expression(self.couplings[c], symbol_table)
+            value = expr()
+            y.append(value)
+            symbol_table.variables[c] = value
 
-        return parser.evaluate(self.obj), np.array([y])
-
+        # Calculate objective
+        obj_expr = cexprtk.Expression(self.obj, symbol_table)
+        return obj_expr(), np.array([y])

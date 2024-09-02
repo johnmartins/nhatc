@@ -18,7 +18,7 @@ spi_1 = DynamicSubProblem()
 spi_1.index = 0
 spi_1.obj = "(a + b) / w"
 spi_1.variables = {'b': 1, 'w': 2}
-spi_1.couplings = {'a': 'w + (1/(b**2))'}
+spi_1.couplings = {'a': 'w + (1/(b^2))'}
 
 
 spi_2 = DynamicSubProblem()
