@@ -1,3 +1,4 @@
+import time
 from typing import Callable, Optional
 
 from numpy.linalg import norm
@@ -10,12 +11,14 @@ from nhatc.models.problems import SubProblem, ProgrammaticSubProblem, DynamicSub
 
 
 class Result:
-    def __init__(self, successful_convergence, epsilon, epsilon_diff, f_star, x_star):
+    def __init__(self, successful_convergence, epsilon, epsilon_diff, f_star, x_star,
+                 process_time):
         self.successful_convergence: bool = successful_convergence
         self.epsilon: float = epsilon
         self.epsilon_diff: float = epsilon_diff
         self.f_star = f_star
         self.x_star = x_star
+        self.time = process_time
 
 
 class Coordinator:
@@ -171,8 +174,9 @@ class Coordinator:
                 return func(self.X)
         elif self.subproblem_in_evaluation.type == SubProblem.TYPE_DYNAMIC:
             def wrapper(*args, **kwargs):
-                self.subproblem_in_evaluation._refresh_symbol_table(self.X)
-                expr = cexprtk.Expression(func, self.subproblem_in_evaluation.symbol_table)
+                self.subproblem_in_evaluation.update_variables(self.X)
+                expr = self.subproblem_in_evaluation.const_expr[func]
+                # expr = cexprtk.Expression(func, self.subproblem_in_evaluation.symbol_table)
                 return expr()
         else:
             raise ValueError(f'Unknown subproblem type {self.subproblem_in_evaluation.type}.')
@@ -181,7 +185,11 @@ class Coordinator:
 
     def run_subproblem_optimization(self, subproblem, NI, method):
         if self.subproblem_in_evaluation.type == SubProblem.TYPE_PROGRAMMATIC:
+            # Store objective function such that it can be accessed anywhere in this class
             self.programmatic_function_in_evaluation = subproblem.objective_function
+        elif self.subproblem_in_evaluation.type == SubProblem.TYPE_DYNAMIC:
+            # Update symbol table to avoid initially unset constants
+            self.subproblem_in_evaluation.pre_compile(self.X, skip_if_initialized=True)
 
         self.XD_indices = []
         self.XC_indices = []
@@ -245,6 +253,7 @@ class Coordinator:
         :param i_max_outerloop: Maximum iterations of outer loop (NO)
         :return:
         """
+        t_start = time.process_time()
         # Setup parameters
         self.beta = beta
         self.gamma = gamma
@@ -282,11 +291,14 @@ class Coordinator:
                         print(f"Convergence achieved after {iteration+1} iterations.")
                         print(f'X* = {self.X}')
                         print(f'F* = {self.F_star}')
-                return Result(True, epsilon, epsilon_diff, self.F_star, self.X)
+
+                process_time = time.process_time() - t_start
+                return Result(True, epsilon, epsilon_diff, self.F_star, self.X, process_time)
 
             iteration += 1
 
         print(f"Failed to converge after {iteration+1} iterations")
         print(f'Epsilon = {epsilon}')
-        return Result(False, epsilon, epsilon_diff, self.F_star, self.X)
+        process_time = time.process_time() - t_start
+        return Result(False, epsilon, epsilon_diff, self.F_star, self.X, process_time)
 

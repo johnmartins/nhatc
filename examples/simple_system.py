@@ -1,3 +1,4 @@
+import time
 import numpy as np
 
 from nhatc import ATCVariable, Coordinator, ProgrammaticSubProblem
@@ -45,32 +46,26 @@ sp2.set_ineqs([sp2_ineq])
 
 coordinator.set_subproblems([sp1, sp2])
 F_star = [np.inf, 0]
-attempt = 0
 epsilon = 1
-max_attempts = 1
 res = None
 
-while F_star[0] > 20 or F_star[0] < 0 or epsilon > 1e-8 or np.isnan(F_star[0]):
-    attempt += 1
-
-    if attempt > max_attempts:
-        break
-
-    x0 = coordinator.get_random_x0()
-    print(f'x0 = \t {x0}')
-    res = coordinator.optimize(100, x0,
-                               beta=2.0,
-                               gamma=0.25,
-                               convergence_threshold=1e-9,
-                               NI=60,
-                               method='slsqp')
+x0 = np.array([6.76911903, 9.46969758, 1.13955465, 6.54515886, 5.03847838, 4.48557725])
+# x0 = coordinator.get_random_x0()
+print(f'x0 = \t {x0}')
+res = coordinator.optimize(100, x0,
+                           beta=2.0,
+                           gamma=0.25,
+                           convergence_threshold=1e-9,
+                           NI=60,
+                           method='slsqp')
 
 if res:
     if res.successful_convergence:
-        print(f'Reached convergence after {attempt - 1} attempts')
+        print(f'Reached convergence')
     else:
-        print(f'FAILED to reach convergence after {attempt - 1} attempts')
+        print(f'FAILED to reach convergence')
 
+    print(f'Process time: {res.time} seconds')
     print("Verification against objectives:")
     print(f'f* = {res.f_star[0]}')
     print(f'Epsilon = {res.epsilon} ')

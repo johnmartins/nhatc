@@ -31,12 +31,10 @@ spi_array = [spi_1, spi_2]
 
 coordinator.set_subproblems(spi_array)
 F_star = [np.inf, 0]
-attempt = 0
 epsilon = 1
-max_attempts = 1
 
-# x0 = np.array([6.76911903, 9.46969758, 1.13955465, 6.54515886, 5.03847838, 4.48557725])
-x0 = coordinator.get_random_x0()
+x0 = np.array([6.76911903, 9.46969758, 1.13955465, 6.54515886, 5.03847838, 4.48557725])
+# x0 = coordinator.get_random_x0()
 
 print(f'x0 = \t {x0}')
 res = coordinator.optimize(100, x0,
@@ -48,10 +46,11 @@ res = coordinator.optimize(100, x0,
 
 if res:
     if res.successful_convergence:
-        print(f'Reached convergence after {attempt - 1} attempts')
+        print(f'Reached convergence')
     else:
-        print(f'FAILED to reach convergence after {attempt - 1} attempts')
+        print(f'FAILED to reach convergence')
 
+    print(f'Process time: {res.time} seconds')
     print("Verification against objectives:")
     print(f'f* = {res.f_star[0]}')
     print(f'Epsilon = {res.epsilon} ')

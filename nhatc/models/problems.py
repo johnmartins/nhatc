@@ -56,19 +56,49 @@ class DynamicSubProblem(SubProblem):
         self.inequality_constraints: list[str] = []
         self.equality_constraints: list[str] = []
 
-        # Runtime vars
+        ## Runtime vars
+        self.symbol_table_initialized = False
         self.symbol_table = cexprtk.Symbol_Table({}, {}, add_constants=True)
+        # Stored expressions
+        self.obj_expr: Optional[cexprtk.Expression] = None
+        self.c_expr: dict[str, cexprtk.Expression] = {}
+        self.const_expr: dict[str, cexprtk.Expression] = {}
 
-    def _refresh_symbol_table(self, X):
+    def pre_compile(self, X, skip_if_initialized=True):
+        """
+        Build all expressions and the symbol table
+        :param X: Initial value of X
+        :param skip_if_initialized: Do not run this function if it has been run before. Setting this to false enables running the function anyway.
+        :return:
+        """
+        if skip_if_initialized is True and self.symbol_table_initialized:
+            return
+
         # Set variables, build initial symbol table
-        for v in self.variables:
-            self.symbol_table.variables[v] = X[self.variables[v]]
+        self.update_variables(X)
 
         # Calculate coupling variables
         for c in self.couplings:
-            expr = cexprtk.Expression(self.couplings[c], self.symbol_table)
-            value = expr()
-            self.symbol_table.variables[c] = value
+            self.c_expr[c] = cexprtk.Expression(self.couplings[c], self.symbol_table)
+            self.symbol_table.variables[c] = self.c_expr[c]()
+
+        # Precompile constraints
+        for ieqc in self.inequality_constraints:
+            self.const_expr[ieqc] = cexprtk.Expression(ieqc, self.symbol_table)
+        for eqc in self.equality_constraints:
+            self.const_expr[eqc] = cexprtk.Expression(eqc, self.symbol_table)
+
+        self.obj_expr = cexprtk.Expression(self.obj, self.symbol_table)
+        self.symbol_table_initialized = True
+
+    def update_variables(self, X):
+        """
+        Update the symbol table with new values of the current variables.
+        :param X: The current values of X
+        :return:
+        """
+        for v in self.variables:
+            self.symbol_table.variables[v] = X[self.variables[v]]
 
     def get_ineqs(self):
         return self.inequality_constraints
@@ -77,7 +107,6 @@ class DynamicSubProblem(SubProblem):
         return self.equality_constraints
 
     def eval(self, X):
-
         # Set variables, build initial symbol table
         for v in self.variables:
             self.symbol_table.variables[v] = X[self.variables[v]]
@@ -85,11 +114,9 @@ class DynamicSubProblem(SubProblem):
         # Calculate coupling variables
         y = []
         for c in self.couplings:
-            expr = cexprtk.Expression(self.couplings[c], self.symbol_table)
-            value = expr()
+            value = self.c_expr[c]()
             y.append(value)
             self.symbol_table.variables[c] = value
 
         # Calculate objective
-        obj_expr = cexprtk.Expression(self.obj, self.symbol_table)
-        return obj_expr(), np.array([y])
+        return self.obj_expr(), np.array([y])
