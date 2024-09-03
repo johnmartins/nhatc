@@ -1,5 +1,3 @@
-import numpy as np
-
 from nhatc import ATCVariable, Coordinator, DynamicSubProblem
 
 
@@ -29,8 +27,6 @@ spi_2.inequality_constraints.append('3 - ( b + w )')
 spi_array = [spi_1, spi_2]
 
 coordinator.set_subproblems(spi_array)
-F_star = [np.inf, 0]
-epsilon = 1
 
 # x0 = np.array([6.76911903, 9.46969758, 1.13955465, 6.54515886, 5.03847838, 4.48557725])
 x0 = coordinator.get_random_x0()

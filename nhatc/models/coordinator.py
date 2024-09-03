@@ -4,7 +4,6 @@ from typing import Callable, Optional
 from numpy.linalg import norm
 import numpy as np
 from scipy.optimize import minimize
-import cexprtk
 
 from nhatc.models.variables import ATCVariable
 from nhatc.models.problems import SubProblem, ProgrammaticSubProblem, DynamicSubProblem

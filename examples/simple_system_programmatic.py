@@ -1,5 +1,3 @@
-import numpy as np
-
 from nhatc import ATCVariable, Coordinator, ProgrammaticSubProblem
 
 
@@ -43,9 +41,6 @@ sp2.set_objective(sp2_objective)
 sp2.set_ineqs([sp2_ineq])
 
 coordinator.set_subproblems([sp1, sp2])
-F_star = [np.inf, 0]
-epsilon = 1
-res = None
 
 # x0 = np.array([6.76911903, 9.46969758, 1.13955465, 6.54515886, 5.03847838, 4.48557725])
 x0 = coordinator.get_random_x0()
