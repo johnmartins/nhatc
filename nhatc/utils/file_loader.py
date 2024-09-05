@@ -37,7 +37,6 @@ def import_system_analysis_json(filepath, verbose=True) -> Coordinator:
 
         sp_vars = {}
         sp_couplings = {}
-        print(subsystem['variables'])
         for v_idx in subsystem['variables']:
             av = av_idx_map[v_idx]
             if av.coupled_variable:
@@ -48,7 +47,13 @@ def import_system_analysis_json(filepath, verbose=True) -> Coordinator:
         sp.variables = sp_vars
         sp.couplings = sp_couplings
 
-        print(sp.variables)
+        for constraint in subsystem['constraints']:
+            if constraint['type'] == 'ieq':
+                sp.inequality_constraints.append(constraint['expression'])
+            elif constraint ['type'] == 'eq':
+                sp.equality_constraints.append(constraint['expression'])
+            else:
+                raise ValueError(f'Unknown constraint type' + str({constraint['type']}))
 
         sp_list.append(sp)
 
