@@ -45,7 +45,6 @@ class Coordinator:
         self.q_current = np.array([], dtype=float)
         self.xl_array = []
         self.xu_array = []
-        self.var_name_map = {}
         self.F_star = []
         self.inner_iteration = 0
 
@@ -74,21 +73,10 @@ class Coordinator:
         assert len(self.I) == len(self.I_prime)
         self.n_q = len(self.I)
 
-        self.update_variable_name_map()
         self.update_scaling_vector()
         self.linear_weights = np.zeros(self.n_q)
         self.quadratic_weights = np.ones(self.n_q)
         self.update_boundary_arrays()
-
-    def update_variable_name_map(self):
-        self.var_name_map = {}
-        for variable in self.variables:
-            if variable.name in self.var_name_map:
-                raise NameError(f'Variable names need to be unique. Found duplicate: {variable.name}')
-
-            self.var_name_map[variable.name] = variable.index
-
-        return self.var_name_map
 
     def update_boundary_arrays(self):
         self.xl_array = np.zeros(self.n_vars, dtype=float)
@@ -140,13 +128,6 @@ class Coordinator:
     def set_subproblems(self, subproblems: list[SubProblem]):
         self.subproblems = subproblems
         self.F_star = [None] * len(self.subproblems)
-
-    def get_variables(self, var_names: list[str]):
-        vars = []
-        for var_name in var_names:
-            vars.append(self.X[self.var_name_map[var_name]])
-
-        return vars
 
     def evaluate_subproblem(self, XD):
         self.X[self.XD_indices] = XD
