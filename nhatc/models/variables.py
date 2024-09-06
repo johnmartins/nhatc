@@ -23,4 +23,7 @@ class ATCVariable:
         self.lb = lb
         self.ub = ub
 
+    def __str__(self):
+        return f"{self.index}\t{self.name}\t{self.subproblem_index}\t{self.coupled_variable}\t{self.links}\t[{self.lb}, {self.ub}]"
+
 

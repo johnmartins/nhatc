@@ -27,6 +27,9 @@ def import_system_analysis_json(filepath, verbose=True) -> Coordinator:
         v_list.append(av)
         av_idx_map[v_idx] = av
 
+        if verbose:
+            print(av)
+
     coordinator.set_variables(v_list)
 
     sp_list = []
