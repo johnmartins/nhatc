@@ -92,7 +92,7 @@
         },
         {
             "ss_index": 1,
-            "objective": 0,
+            "objective": "b + w",
             "variables": [
                 2,
                 3,

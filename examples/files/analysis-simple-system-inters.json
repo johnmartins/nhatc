@@ -22,7 +22,7 @@
             ],
             "lb": 0,
             "ub": 10,
-            "expression": "w + (1 / ( b^2 ))"
+            "expression": "w + inter"
         },
         {
             "v_index": 2,
@@ -34,10 +34,9 @@
             ],
             "lb": 0,
             "ub": 10,
-            "expression": "(a / 2) * w"
+            "expression": "inter_b * w"
         },
         {
-            "position": -1,
             "v_index": 3,
             "symbol": "w",
             "ss_index": 1,
@@ -50,7 +49,6 @@
             "expression": ""
         },
         {
-            "position": -1,
             "v_index": 4,
             "symbol": "a",
             "ss_index": 1,
@@ -63,7 +61,6 @@
             "expression": ""
         },
         {
-            "position": -1,
             "v_index": 5,
             "symbol": "b",
             "ss_index": 0,
@@ -74,6 +71,28 @@
             "lb": 0,
             "ub": 10,
             "expression": ""
+        },
+        {
+            "v_index": 6,
+            "symbol": "inter",
+            "ss_index": 0,
+            "type": "intermediate",
+            "links": [
+            ],
+            "lb": null,
+            "ub": null,
+            "expression": "(1/b^2)"
+        },
+        {
+            "v_index": 7,
+            "symbol": "inter_b",
+            "ss_index": 1,
+            "type": "intermediate",
+            "links": [
+            ],
+            "lb": null,
+            "ub": null,
+            "expression": "(a/2)"
         }
     ],
     "subsystems": [
@@ -83,7 +102,8 @@
             "variables": [
                 0,
                 1,
-                5
+                5,
+                6
             ],
             "constraints": [
             ],
@@ -92,16 +112,17 @@
         },
         {
             "ss_index": 1,
-            "objective": 0,
+            "objective": "0",
             "variables": [
                 2,
                 3,
-                4
+                4,
+                7
             ],
             "constraints": [
                 {
                     "type": "ieq",
-                    "expression": "3 - (b + w)"
+                    "expression": "3 - ( b + w )"
                 }
             ],
             "couplings": {

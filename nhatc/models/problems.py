@@ -52,6 +52,7 @@ class DynamicSubProblem(SubProblem):
         self.variables: dict[str, int] = {}
         self.ineqs: list[str] = []
         self.couplings: dict[str, str] = {}
+        self.intermediates: dict[str, str] = {}
 
         self.inequality_constraints: list[str] = []
         self.equality_constraints: list[str] = []
@@ -62,6 +63,7 @@ class DynamicSubProblem(SubProblem):
         # Stored expressions
         self.obj_expr: Optional[cexprtk.Expression] = None
         self.c_expr: dict[str, cexprtk.Expression] = {}
+        self.inter_expr: dict[str, cexprtk.Expression] = {}
         self.const_expr: dict[str, cexprtk.Expression] = {}
 
     def pre_compile(self, X, skip_if_initialized=True):
@@ -74,8 +76,15 @@ class DynamicSubProblem(SubProblem):
         if skip_if_initialized is True and self.symbol_table_initialized:
             return
 
+        print("precompiling")
+
         # Set variables, build initial symbol table
         self.update_variables(X)
+
+        for inter in self.intermediates:
+            print(f"precompiling {inter} = {self.intermediates[inter]} to inters")
+            self.inter_expr[inter] = cexprtk.Expression(self.intermediates[inter], self.symbol_table)
+            self.symbol_table.variables[inter] = self.inter_expr[inter]()
 
         # Calculate coupling variables
         for c in self.couplings:
@@ -106,10 +115,16 @@ class DynamicSubProblem(SubProblem):
     def get_eqs(self):
         return self.equality_constraints
 
+    def add_intermediate_variable(self, symbol, expression):
+        self.intermediates[symbol] = expression
+
     def eval(self, X):
         # Set variables, build initial symbol table
         for v in self.variables:
             self.symbol_table.variables[v] = X[self.variables[v]]
+
+        for inter in self.inter_expr:
+            self.inter_expr[inter]()
 
         # Calculate coupling variables
         y = []
