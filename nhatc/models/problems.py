@@ -88,8 +88,14 @@ class DynamicSubProblem(SubProblem):
 
         # Calculate coupling variables
         for c in self.couplings:
-            self.c_expr[c] = cexprtk.Expression(self.couplings[c], self.symbol_table)
-            self.symbol_table.variables[c] = self.c_expr[c]()
+            try:
+                self.c_expr[c] = cexprtk.Expression(self.couplings[c], self.symbol_table)
+                self.symbol_table.variables[c] = self.c_expr[c]()
+            except cexprtk.ParseException as err:
+                print(f'\nERROR: Failed to parse exception for symbol "{c}". \nReason: {repr(err)}')
+                print(f'Expression: \n{self.couplings[c]}\n')
+                raise err
+
 
         # Precompile constraints
         for ieqc in self.inequality_constraints:

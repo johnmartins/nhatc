@@ -1,0 +1,204 @@
+{
+    "variables": [
+        {
+            "v_index": 0,
+            "symbol": "ww",
+            "ss_index": 1,
+            "type": "coupling",
+            "links": [
+                8
+            ],
+            "lb": 0,
+            "ub": 100000,
+            "expression": "var a := (1 + sqrt((x0_1 - 1)^2 + (x0_2 - 1)^2)^2);\nvar b := (1 + sqrt((x2_1 - 1)^2 + (x2_2 - 1)^2)^2);\n4000 * a * b;"
+        },
+        {
+            "position": 4,
+            "v_index": 1,
+            "symbol": "wf",
+            "ss_index": 2,
+            "type": "coupling",
+            "links": [
+                9
+            ],
+            "lb": 0,
+            "ub": 100000,
+            "expression": "var x0[2] := {x0_1, x0_2};\nvar x3[2] := {x3_1, x3_2};\nvar xs[2] := {10 * (x0[0] + x3[0]), 10 * (x0[1] + x3[1])};\nvar EH1 := (xs[1] + 47) * sin(sqrt(abs(xs[1] + xs[0]/2 + 47)));\nvar EH2 := xs[0] * sin(sqrt(abs(xs[0] - (xs[1] + 47))));\nvar EH := - EH1 - EH2;\nvar omega1 := 1 + sqrt((x0[0]-2)^2 + (x0[1]-2)^2)^2;\nvar omega2 := 1 + 0.001*sqrt((x3[0]-2)^2 + (x3[1] -2)^2)^2;\nvar omega3 := 1 + 1000*abs(eh);\nvar omega := omega1 * omega2 * omega3;\nvar dr := 0.025 + 0.004 * log10(omega);\n20000 + 380952 * dr + 9523809 * dr * dr;"
+        },
+        {
+            "position": 0,
+            "v_index": 2,
+            "symbol": "x0_1",
+            "ss_index": 2,
+            "type": "designvariable",
+            "links": [
+                10
+            ],
+            "lb": 0,
+            "ub": 10,
+            "expression": ""
+        },
+        {
+            "position": 1,
+            "v_index": 3,
+            "symbol": "x0_2",
+            "ss_index": 2,
+            "type": "designvariable",
+            "links": [
+                11
+            ],
+            "lb": 0,
+            "ub": 10,
+            "expression": ""
+        },
+        {
+            "position": 1,
+            "v_index": 4,
+            "symbol": "x2_1",
+            "ss_index": 1,
+            "type": "designvariable",
+            "links": [
+            ],
+            "lb": 0,
+            "ub": 10,
+            "expression": ""
+        },
+        {
+            "position": 2,
+            "v_index": 5,
+            "symbol": "x2_2",
+            "ss_index": 1,
+            "type": "designvariable",
+            "links": [
+            ],
+            "lb": 0,
+            "ub": 10,
+            "expression": ""
+        },
+        {
+            "position": 2,
+            "v_index": 6,
+            "symbol": "x3_1",
+            "ss_index": 2,
+            "type": "designvariable",
+            "links": [
+            ],
+            "lb": 0,
+            "ub": 10,
+            "expression": ""
+        },
+        {
+            "position": 3,
+            "v_index": 7,
+            "symbol": "x3_2",
+            "ss_index": 2,
+            "type": "designvariable",
+            "links": [
+            ],
+            "lb": 0,
+            "ub": 10,
+            "expression": ""
+        },
+        {
+            "position": -1,
+            "v_index": 8,
+            "symbol": "ww",
+            "ss_index": 0,
+            "type": "mirror",
+            "links": [
+                0
+            ],
+            "lb": 0,
+            "ub": 100000,
+            "expression": ""
+        },
+        {
+            "position": -1,
+            "v_index": 9,
+            "symbol": "wf",
+            "ss_index": 0,
+            "type": "mirror",
+            "links": [
+                1
+            ],
+            "lb": 0,
+            "ub": 100000,
+            "expression": ""
+        },
+        {
+            "position": -1,
+            "v_index": 10,
+            "symbol": "x0_1",
+            "ss_index": 1,
+            "type": "mirror",
+            "links": [
+                2
+            ],
+            "lb": 0,
+            "ub": 10,
+            "expression": ""
+        },
+        {
+            "position": -1,
+            "v_index": 11,
+            "symbol": "x0_2",
+            "ss_index": 1,
+            "type": "mirror",
+            "links": [
+                3
+            ],
+            "lb": 0,
+            "ub": 10,
+            "expression": ""
+        }
+    ],
+    "subsystems": [
+        {
+            "ss_index": 0,
+            "objective": "60000 + ww + wf;",
+            "variables": [
+                8,
+                9
+            ],
+            "constraints": [
+            ],
+            "couplings": {
+            }
+        },
+        {
+            "ss_index": 1,
+            "objective": 0,
+            "variables": [
+                0,
+                4,
+                5,
+                10,
+                11
+            ],
+            "constraints": [
+            ],
+            "couplings": {
+            }
+        },
+        {
+            "ss_index": 2,
+            "objective": 0,
+            "variables": [
+                1,
+                2,
+                3,
+                6,
+                7
+            ],
+            "constraints": [
+            ],
+            "couplings": {
+            }
+        }
+    ],
+    "settings": {
+        "beta": 0.5,
+        "gamma": 0.5,
+        "convergence_threshold": 1E-08
+    }
+}
