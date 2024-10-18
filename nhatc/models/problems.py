@@ -11,6 +11,7 @@ class SubProblem:
     def __init__(self, type: str):
         self.index = -1
         self.type = type
+        self._coordinator = None
 
         if self.type not in [SubProblem.TYPE_DYNAMIC, SubProblem.TYPE_PROGRAMMATIC]:
             raise ValueError(f'Unknown subproblem type {self.type}')
@@ -66,7 +67,7 @@ class DynamicSubProblem(SubProblem):
         self.inter_expr: dict[str, cexprtk.Expression] = {}
         self.const_expr: dict[str, cexprtk.Expression] = {}
 
-    def pre_compile(self, X, skip_if_initialized=True):
+    def pre_compile(self, X, skip_if_initialized: bool = True, custom_functions: dict[str, callable] = {}):
         """
         Build all expressions and the symbol table
         :param X: Initial value of X
@@ -76,13 +77,14 @@ class DynamicSubProblem(SubProblem):
         if skip_if_initialized is True and self.symbol_table_initialized:
             return
 
-        print("precompiling")
+        if self._coordinator.verbose:
+            print(f"Precompiling expressions for SubProblem {self.index}")
 
         # Set variables, build initial symbol table
+        self.set_custom_functions(custom_functions)
         self.update_variables(X)
 
         for inter in self.intermediates:
-            print(f"precompiling {inter} = {self.intermediates[inter]} to inters")
             self.inter_expr[inter] = cexprtk.Expression(self.intermediates[inter], self.symbol_table)
             self.symbol_table.variables[inter] = self.inter_expr[inter]()
 
@@ -114,6 +116,18 @@ class DynamicSubProblem(SubProblem):
         """
         for v in self.variables:
             self.symbol_table.variables[v] = X[self.variables[v]]
+
+    def set_custom_functions(self, custom_functions: dict[str, callable]):
+        """
+        Define any custom functions in the symbol table
+        :param custom_functions:
+        :return:
+        """
+        for key in custom_functions:
+            self.symbol_table.functions[key] = custom_functions[key]
+
+            if self._coordinator.verbose:
+                print(f'Registered custom function "{key}" in SubProblem {self.index}')
 
     def get_ineqs(self):
         return self.inequality_constraints

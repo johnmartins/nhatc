@@ -47,6 +47,13 @@ class Coordinator:
         self.xu_array = []
         self.F_star = []
         self.inner_iteration = 0
+        self.custom_functions: dict[str, callable] = {}
+
+    def add_custom_function(self, fname: str, func: callable):
+        if fname in self.custom_functions:
+            raise ValueError(f'function {fname} already registered as custom function')
+
+        self.custom_functions[fname] = func
 
     def get_random_x0(self):
         r = np.random.rand(len(self.variables))
@@ -129,6 +136,9 @@ class Coordinator:
         self.subproblems = subproblems
         self.F_star = [None] * len(self.subproblems)
 
+        for sp in self.subproblems:
+            sp._coordinator = self
+
     def evaluate_subproblem(self, XD):
         self.X[self.XD_indices] = XD
 
@@ -169,7 +179,8 @@ class Coordinator:
             self.programmatic_function_in_evaluation = subproblem.objective_function
         elif self.subproblem_in_evaluation.type == SubProblem.TYPE_DYNAMIC:
             # Update symbol table to avoid initially unset constants
-            self.subproblem_in_evaluation.pre_compile(self.X, skip_if_initialized=True)
+            self.subproblem_in_evaluation.pre_compile(self.X, skip_if_initialized=True,
+                                                      custom_functions=self.custom_functions)
 
         self.XD_indices = []
         self.XC_indices = []
