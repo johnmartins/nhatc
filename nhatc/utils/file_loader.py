@@ -9,6 +9,8 @@ def import_system_analysis_json(filepath, verbose=True) -> Coordinator:
 
     coordinator = Coordinator(verbose=verbose)
     v_idx_to_av_map = {}
+    v_idx_to_id_map = {}
+    id_to_order_map = {}
     v_idx_intermediate_set = set()
     v_exp_table = {}
     v_list = []
@@ -17,7 +19,16 @@ def import_system_analysis_json(filepath, verbose=True) -> Coordinator:
     for variable in analysis_object['variables']:
         v_idx = variable['v_index']
         v_type = variable['type']
+        v_order = variable['position']
         ss_idx = variable['ss_index']
+        name = variable['symbol']
+        v_id = variable['id']
+
+        # Mirrored variables should always be resolved first.
+        if v_type == 'mirror':
+            id_to_order_map[v_id] = -1
+        else:
+            id_to_order_map[v_id] = v_order
 
         if ss_idx not in intermediate_variables:
             intermediate_variables[ss_idx] = []
@@ -27,7 +38,7 @@ def import_system_analysis_json(filepath, verbose=True) -> Coordinator:
             v_idx_intermediate_set.add(v_idx)
             continue
 
-        name = variable['symbol']
+        v_idx_to_id_map[v_idx] = v_id
         links = variable['links']
         lb = variable['lb']
         ub = variable['ub']
@@ -64,13 +75,17 @@ def import_system_analysis_json(filepath, verbose=True) -> Coordinator:
             else:
                 sp_vars[av.name] = v_idx
 
+            v_id = v_idx_to_id_map[v_idx]
+            sp.set_order_of_symbol(av.name, id_to_order_map[v_id])
+
         sp.variables = sp_vars
         sp.couplings = sp_couplings
 
         # Register intermediate variable expressions in sub-system
         for var_inter in intermediate_variables[sp.index]:
-            print(f'Added {var_inter} to SP{sp.index}')
-            sp.add_intermediate_variable(var_inter['symbol'], var_inter['expression'])
+            inter_symbol = var_inter['symbol']
+            sp.add_intermediate_variable(inter_symbol, var_inter['expression'])
+            sp.set_order_of_symbol(inter_symbol, id_to_order_map[var_inter['id']])
 
         for constraint in subsystem['constraints']:
             if constraint['type'] == 'ieq':

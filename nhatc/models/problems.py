@@ -1,3 +1,4 @@
+import operator
 import numpy as np
 
 from typing import Optional, Callable
@@ -54,6 +55,7 @@ class DynamicSubProblem(SubProblem):
         self.ineqs: list[str] = []
         self.couplings: dict[str, str] = {}
         self.intermediates: dict[str, str] = {}
+        self.symbol_order: dict[str, int] = {}
 
         self.inequality_constraints: list[str] = []
         self.equality_constraints: list[str] = []
@@ -66,6 +68,23 @@ class DynamicSubProblem(SubProblem):
         self.c_expr: dict[str, cexprtk.Expression] = {}
         self.inter_expr: dict[str, cexprtk.Expression] = {}
         self.const_expr: dict[str, cexprtk.Expression] = {}
+
+    def set_order_of_symbol(self, symbol, order):
+        if symbol in self.symbol_order:
+            raise ValueError(f'Symbol already in order table for sub system {self.index}')
+
+        self.symbol_order[symbol] = order
+
+    def get_symbol_order(self, symbol):
+        """
+        If there is a specified symbol order, return it.
+        :param symbol:
+        :return:
+        """
+        if symbol in self.symbol_order:
+            return self.symbol_order[symbol]
+        else:
+            return -1
 
     def pre_compile(self, X, skip_if_initialized: bool = True, custom_functions: dict[str, callable] = {}):
         """
@@ -84,20 +103,31 @@ class DynamicSubProblem(SubProblem):
         self.set_custom_functions(custom_functions)
         self.update_variables(X)
 
-        for inter in self.intermediates:
-            self.inter_expr[inter] = cexprtk.Expression(self.intermediates[inter], self.symbol_table)
-            self.symbol_table.variables[inter] = self.inter_expr[inter]()
+        # TODO: Loop through couplings AND intermediaries sorted by order of operation
+        symbol_array = list(self.intermediates.keys()) + list(self.couplings)
+        symbol_array.sort(key=lambda x: self.get_symbol_order(x)) #TODO: fix?!
 
-        # Calculate coupling variables
-        for c in self.couplings:
-            try:
-                self.c_expr[c] = cexprtk.Expression(self.couplings[c], self.symbol_table)
-                self.symbol_table.variables[c] = self.c_expr[c]()
-            except cexprtk.ParseException as err:
-                print(f'\nERROR: Failed to parse exception for symbol "{c}". \nReason: {repr(err)}')
-                print(f'Expression: \n{self.couplings[c]}\n')
-                raise err
+        if self._coordinator.verbose:
+            print(f"Expression order in SS {self.index}: {symbol_array}")
 
+        for symbol in symbol_array:
+            if symbol in self.intermediates:
+                try:
+                    self.inter_expr[symbol] = cexprtk.Expression(self.intermediates[symbol], self.symbol_table)
+                    self.symbol_table.variables[symbol] = self.inter_expr[symbol]()
+                except cexprtk.ParseException as err:
+                    print(f'\nERROR: Failed to parse exception for symbol "{symbol}". \nReason: {repr(err)}')
+                    print(f'Expression: \n{self.inter_expr[symbol]}\n')
+                    raise err
+
+            if symbol in self.couplings:
+                try:
+                    self.c_expr[symbol] = cexprtk.Expression(self.couplings[symbol], self.symbol_table)
+                    self.symbol_table.variables[symbol] = self.c_expr[symbol]()
+                except cexprtk.ParseException as err:
+                    print(f'\nERROR: Failed to parse exception for symbol "{symbol}". \nReason: {repr(err)}')
+                    print(f'Expression: \n{self.couplings[symbol]}\n')
+                    raise err
 
         # Precompile constraints
         for ieqc in self.inequality_constraints:
@@ -139,6 +169,7 @@ class DynamicSubProblem(SubProblem):
         self.intermediates[symbol] = expression
 
     def eval(self, X):
+        # TODO: Resolve variables based on order, if any
         # Set variables, build initial symbol table
         for v in self.variables:
             self.symbol_table.variables[v] = X[self.variables[v]]
