@@ -21,7 +21,7 @@ coordinator.set_variables([
 ])
 
 
-def sp1_objective(X):   # TODO: Fix because some vars are supposed to be vectors
+def sp1_objective(X):
     ww, wf = X[[0, 1]]
     f = 60000 + ww + wf
     y = []
@@ -105,5 +105,3 @@ if res:
         print(f'{name}\t[{lb}; {ub}]\tvalue: {x_i}')
 else:
     print('Catastrophic failure')
-
-

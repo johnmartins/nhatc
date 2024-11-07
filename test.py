@@ -1,6 +1,7 @@
 from nhatc.utils import import_system_analysis_json
+import cexprtk
 
-filepath = r'C:\Users\julianm\OneDrive - Chalmers\Documents\projects\nhatc\examples\files\analysis-simple-system.json'
+filepath = r'C:\Users\julianm\OneDrive - Chalmers\Documents\projects\nhatc\system_analysis.json'
 
 coordinator = import_system_analysis_json(filepath)
 x0 = coordinator.get_random_x0()
@@ -21,6 +22,7 @@ if res:
     print("Verification against objectives:")
     print(f'f* = {res.f_star[0]}')
     print(f'Epsilon = {res.epsilon} ')
+    print(res.f_star)
 
     print('x*:')
     for i, x_i in enumerate(res.x_star):
@@ -31,7 +33,3 @@ if res:
         print(f'{name}\t[{lb}; {ub}]\tvalue: {x_i}')
 else:
     print('Catastrophic failure')
-
-
-
-
