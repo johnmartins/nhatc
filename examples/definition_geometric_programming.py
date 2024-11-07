@@ -1,6 +1,6 @@
 import numpy as np
 
-from nhatc.models import ATCVariable, Coordinator, SubProblem
+from nhatc import ATCVariable, Coordinator, ProgrammaticSubProblem
 from numpy.linalg import norm
 
 lb = 1e-6
@@ -40,7 +40,6 @@ def sp1_objective(X):
     return f, y
 
 
-@coordinator.prepare_constraint
 def sp1_ieq_1(X):
     z3, z4, z5, z6, z7 = X[[0, 2, 3, 4, 6]]
     res = - np.pow(z3, -2) - np.pow(z4, 2) + np.pow(z5, 2)
@@ -48,7 +47,6 @@ def sp1_ieq_1(X):
     return res
 
 
-@coordinator.prepare_constraint
 def sp1_ieq_2(X):
     z3, z4, z5, z6, z7 = X[[0, 2, 3, 4, 6]]
     res = - np.pow(z5, 2) - np.pow(z6, -2) + np.pow(z7, 2)
@@ -66,13 +64,11 @@ def sp2_objective(X):
     return f, y
 
 
-@coordinator.prepare_constraint
 def sp2_ieq_1(X):
     z8, z9, z10, z11 = X[[7, 8, 9, 10]]
     return - np.pow(z8, 2) - np.pow(z9, 2) + np.pow(z11, 2)
 
 
-@coordinator.prepare_constraint
 def sp2_ieq_2(X):
     z8, z9, z10, z11 = X[[7, 8, 9, 10]]
     return - np.pow(z8, -2) - np.pow(z10, 2) + np.pow(z11, 2)
@@ -87,38 +83,34 @@ def sp3_objective(X):
     return f, y
 
 
-@coordinator.prepare_constraint
 def sp3_ieq_1(X):
     z11, z12, z13, z14 = X[[11, 12, 13, 14]]
     return - np.pow(z11, 2) - np.pow(z12, -2) + np.pow(z13, 2)
 
 
-@coordinator.prepare_constraint
 def sp3_ieq_2(X):
     z11, z12, z13, z14 = X[[11, 12, 13, 14]]
     res = - np.pow(z11, 2) - np.pow(z12, 2) + np.pow(z14, 2)
     return res
 
 
-sp1 = SubProblem(0)
+sp1 = ProgrammaticSubProblem(0)
 sp1.set_objective(sp1_objective)
 sp1.set_ineqs([sp1_ieq_1, sp2_ieq_2])
-sp2 = SubProblem(1)
+sp2 = ProgrammaticSubProblem(1)
 sp2.set_objective(sp2_objective)
 sp2.set_ineqs([sp2_ieq_1, sp2_ieq_2])
-sp3 = SubProblem(2)
+sp3 = ProgrammaticSubProblem(2)
 sp3.set_objective(sp3_objective)
 sp3.set_ineqs([sp3_ieq_1, sp3_ieq_2])
 
 x0 = np.array(np.random.uniform(low=lb, high=ub, size=15), dtype=float)
 coordinator.set_subproblems([sp1, sp2, sp3])
-X_star, F_star, epsilon = coordinator.optimize(10000, x0, beta=2.0, gamma=0.4, convergence_threshold=1e-12)
+res = coordinator.optimize(10000, x0, beta=2.0, gamma=0.4, convergence_threshold=1e-12)
 
 
 print("Verification against objectives:")
-print(f'Objective 1 F* = {sp1_objective(X_star)[0]}')
-print(f'Objective 2 F* = {sp2_objective(X_star)[0]}')
-print(f'Objective 3 F* = {sp3_objective(X_star)[0]}')
-print(f'Epsilon = {epsilon}')
-print(X_star)
+print(f'Objective F* = {sp1_objective(res.x_star)[0]}')
+print(f'Epsilon = {res.epsilon}')
+print(res.x_star)
 

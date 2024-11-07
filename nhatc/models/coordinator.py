@@ -210,6 +210,9 @@ class Coordinator:
 
         x0 = self.X[self.XD_indices]
 
+        if len(self.XD_indices) == 0:
+            raise ValueError('The defined system contains no design variables that can be varied. The system is static.')
+
         self.inner_iteration = 0
 
         res = minimize(self.evaluate_subproblem, x0,

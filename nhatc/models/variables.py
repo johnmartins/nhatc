@@ -1,3 +1,4 @@
+from typing import Optional
 from numpy import inf
 
 
@@ -15,13 +16,13 @@ class ATCVariable:
         :param lb: lower bound
         :param ub: upper bound
         """
-        self.name = name
-        self.index = index
-        self.subproblem_index = subproblem_index
-        self.coupled_variable = coupled_variable
-        self.links = links
-        self.lb = lb
-        self.ub = ub
+        self.name: str = name
+        self.index: int = index
+        self.subproblem_index: int = subproblem_index
+        self.coupled_variable: bool = coupled_variable
+        self.links: list[int] = links
+        self.lb: float = lb
+        self.ub: float = ub
 
     def __str__(self):
         return f"{self.index}\t{self.name}\t{self.subproblem_index}\t{self.coupled_variable}\t{self.links}\t[{self.lb}, {self.ub}]"
