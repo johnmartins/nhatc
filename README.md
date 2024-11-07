@@ -1,3 +1,6 @@
+# Install
+```pip install nhatc```
+
 # Non-Hierarchical Analytical Target Cascading
 This library is an interpretation of Non-hierarchical analytical target cascading,
 as specified by Talgorn and Kokkolaras in their 2017 paper 

@@ -1,2 +1,5 @@
+dist/
+build/
+nhatc.egg-info/
 .idea
 *.pyc
