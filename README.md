@@ -22,6 +22,91 @@ The library can either be used programmatically. For instance, you may be using 
 set up and configure your optimization problem. Or, you can use the library dynamically, which is better suited for
 when the input is non-static: i.e., when the input is controlled through a GUI.
 
+
+## Programmatic example
+
+```python
+from nhatc import ATCVariable, Coordinator, ProgrammaticSubProblem
+
+coordinator = Coordinator(verbose=True) # Verbose: print process to terminal
+# Define variables. The constructor arguments for the ATCVariable class are:
+# Variable name, Variable index, Sub-system index, Coupling variable, Lower bound, Upper bound
+coordinator.set_variables([
+    ATCVariable('a1', 0, 0, True, [3], 0, 10),
+    ATCVariable('b1', 1, 0, False, [4], 0, 10),
+    ATCVariable('w1', 2, 0, False, [5], 0, 10),
+    ATCVariable('a2', 3, 1, False, [0], 0, 10),
+    ATCVariable('b2', 4, 1, True, [1], 0, 10),
+    ATCVariable('w2', 5, 1, False, [2], 0, 10),
+])
+
+# Define sub-systems as functions. 
+# Sub-system functions output coupled variables (y) AND the objective (f)
+# The variables have the same indices in X as defined above in the coordinator variable list 
+def sp1_objective(X):
+    b, w = X[[1, 2]]
+    a = w + (1/b**2)
+    f = (a + b) / w
+    y = [a]
+    return f, y
+
+
+def sp2_objective(X):
+    a, w = X[[3, 5]]
+    b = (a/2) * w
+    y = [b]
+    f = 0
+    return f, y
+
+# Any constraints are defined separately as functions. 
+# Note the g(x) ≥ 0 formulation, which is the opposite of what is typically used in Matlab
+def sp2_ineq(X):
+    # g(x) ≥ 0
+    b, w = X[[4, 5]]
+    return 3 - (b + w)  # 3 - ( b + w ) ≥ 0
+
+
+sp1 = ProgrammaticSubProblem(0)
+sp1.set_objective(sp1_objective)
+sp2 = ProgrammaticSubProblem(1)
+sp2.set_objective(sp2_objective)
+# Add constraints to sub-problem
+sp2.set_ineqs([sp2_ineq])
+
+coordinator.set_subproblems([sp1, sp2])
+
+# Generate random x0 based on variable definitions above
+x0 = coordinator.get_random_x0()
+# Run optimization coordination.
+res = coordinator.optimize(100, x0,
+                           beta=2.0,    # Penalty update parameter 1
+                           gamma=0.25,  # Penalty update parameter 2
+                           convergence_threshold=1e-9, 
+                           method='slsqp')  # Optimization method
+
+if res:
+    if res.successful_convergence:
+        print(f'Reached convergence')
+    else:
+        print(f'FAILED to reach convergence')
+
+    print(f'Process time: {res.time} seconds')
+    print("Verification against objectives:")
+    print(f'f* = {res.f_star[0]}')
+    print(f'Epsilon = {res.epsilon} ')
+
+    print('x*:')
+    for i, x_i in enumerate(res.x_star):
+        name = coordinator.variables[i].name
+        lb = coordinator.variables[i].lb
+        ub = coordinator.variables[i].ub
+
+        print(f'{name}\t[{lb}; {ub}]\tvalue: {x_i}')
+else:
+    print('Optimization failed')
+
+```
+
 ## Dynamic example
 
 ```python
@@ -98,83 +183,3 @@ else:
     print('Optimization failed')
 ```
 
-## Programmatic example
-
-```python
-from nhatc import ATCVariable, Coordinator, ProgrammaticSubProblem
-
-coordinator = Coordinator(verbose=True)
-coordinator.set_variables([
-    ATCVariable('a1', 0, 0, True, [3], 0, 10),
-    ATCVariable('b1', 1, 0, False, [4], 0, 10),
-    ATCVariable('w1', 2, 0, False, [5], 0, 10),
-    ATCVariable('a2', 3, 1, False, [0], 0, 10),
-    ATCVariable('b2', 4, 1, True, [1], 0, 10),
-    ATCVariable('w2', 5, 1, False, [2], 0, 10),
-])
-
-# Define sub-systems as functions. 
-# Sub-system functions output coupled variables (y) AND the objective (f)
-# The variables have the same indices in X as defined above in the coordinator variable list 
-def sp1_objective(X):
-    b, w = X[[1, 2]]
-    a = w + (1/b**2)
-    f = (a + b) / w
-    y = [a]
-    return f, y
-
-
-def sp2_objective(X):
-    a, w = X[[3, 5]]
-    b = (a/2) * w
-    y = [b]
-    f = 0
-    return f, y
-
-# Any constraints are defined separately as functions. 
-# Note the g(x) ≥ 0 formulation, which is the opposite of what is typically used in Matlab
-def sp2_ineq(X):
-    # g(x) ≥ 0
-    b, w = X[[4, 5]]
-    return 3 - (b + w)  # 3 - ( b + w ) ≥ 0
-
-
-sp1 = ProgrammaticSubProblem(0)
-sp1.set_objective(sp1_objective)
-sp2 = ProgrammaticSubProblem(1)
-sp2.set_objective(sp2_objective)
-# Add constraints to sub-problem
-sp2.set_ineqs([sp2_ineq])
-
-coordinator.set_subproblems([sp1, sp2])
-
-x0 = coordinator.get_random_x0()
-res = coordinator.optimize(100, x0,
-                           beta=2.0,
-                           gamma=0.25,
-                           convergence_threshold=1e-9,
-                           NI=60,
-                           method='slsqp')
-
-if res:
-    if res.successful_convergence:
-        print(f'Reached convergence')
-    else:
-        print(f'FAILED to reach convergence')
-
-    print(f'Process time: {res.time} seconds')
-    print("Verification against objectives:")
-    print(f'f* = {res.f_star[0]}')
-    print(f'Epsilon = {res.epsilon} ')
-
-    print('x*:')
-    for i, x_i in enumerate(res.x_star):
-        name = coordinator.variables[i].name
-        lb = coordinator.variables[i].lb
-        ub = coordinator.variables[i].ub
-
-        print(f'{name}\t[{lb}; {ub}]\tvalue: {x_i}')
-else:
-    print('Optimization failed')
-
-```
