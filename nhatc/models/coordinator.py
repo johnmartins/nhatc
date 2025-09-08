@@ -55,6 +55,13 @@ class Coordinator:
 
         self.custom_functions[fname] = func
 
+    def get_midpoint_x0(self):
+        x0_list = []
+        for i, var in enumerate(self.variables):
+            x0_list.append((var.ub - var.lb)/2 + var.lb)
+
+        return np.array(x0_list)
+
     def get_random_x0(self):
         r = np.random.rand(len(self.variables))
         x0_list = []
@@ -166,7 +173,6 @@ class Coordinator:
             def wrapper(*args, **kwargs):
                 self.subproblem_in_evaluation.update_variables(self.X)
                 expr = self.subproblem_in_evaluation.const_expr[func]
-                # expr = cexprtk.Expression(func, self.subproblem_in_evaluation.symbol_table)
                 return expr()
         else:
             raise ValueError(f'Unknown subproblem type {self.subproblem_in_evaluation.type}.')
@@ -215,18 +221,22 @@ class Coordinator:
 
         self.inner_iteration = 0
 
+        options = {}
+        if NI is not None:
+            options['maxiter'] = NI
+            options['maxfun'] = NI
+
+        subproblem._successful_optimization = False
         res = minimize(self.evaluate_subproblem, x0,
                        method=method, # Let scipy decide, depending on presence of bounds and constraints
                        bounds=bounds, # Tuple of (min, max)
                        constraints=constraints,
-                       tol=1e-12,
-                       options={
-                           'maxiter': NI,
-                           'maxfun': NI
-                       }) # List of dicts
+                       tol=1e-9,
+                       options=options) # List of dicts
+        subproblem._successful_optimization = res.success
 
         if self.verbose:
-            print(f"Minimized SP{subproblem.index} with {self.inner_iteration} inner iterations")
+            print(f"Minimized SP{subproblem.index} with {self.inner_iteration} inner iterations. Success: {res.success}")
 
         self.q_current = self.get_updated_inconsistency_vector()
         self.X[self.XD_indices] = res.x
@@ -277,15 +287,32 @@ class Coordinator:
             # Total discrepancy between coupled vars in this loop iteration
             epsilon = norm(self.q_current)
 
-            if epsilon_diff < convergence_threshold and epsilon < convergence_threshold:
-                if self.verbose:
-                    with np.printoptions(precision=3, suppress=True):
-                        print(f'{self.q_current}')
-                        print(f'Epsilon = {epsilon}')
-                        print(f"Convergence achieved after {iteration+1} iterations.")
-                        print(f'X* = {self.X}')
-                        print(f'F* = {self.F_star}')
+            # Todo: if ANY subsystem has failed to meet its constraints, continue.
+            constraints_met = True
+            for subproblem in self.subproblems:
+                if not subproblem._successful_optimization:
+                    constraints_met = False
 
+            has_converged = True
+            if epsilon > convergence_threshold:
+                # Check if diff among vars is minimal
+                has_converged = False
+            if epsilon_diff > convergence_threshold:
+                # Check if change in variable difference between iterations was large
+                has_converged = False
+            if not constraints_met:
+                # Assert that each subsystem is within specified constraints (ieq, eq)
+                has_converged = False
+
+            if has_converged and self.verbose:
+                with np.printoptions(precision=3, suppress=True):
+                    print(f'{self.q_current}')
+                    print(f'Epsilon = {epsilon}')
+                    print(f"Convergence achieved after {iteration + 1} iterations.")
+                    print(f'X* = {self.X}')
+                    print(f'F* = {self.F_star}')
+
+            if has_converged:
                 process_time = time.process_time() - t_start
                 return Result(True, epsilon, epsilon_diff, self.F_star, self.X, process_time)
 

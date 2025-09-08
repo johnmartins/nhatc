@@ -3,3 +3,6 @@ build/
 nhatc.egg-info/
 .idea
 *.pyc
+.venv
+.vscode
+.ev-test.py

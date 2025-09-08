@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.1.1'
+VERSION = '0.1.2'
 DESCRIPTION = 'Library for running non-hierarchical multi-disciplinary optimization'
 
 with open("README.md", "r") as fh:
@@ -13,13 +13,13 @@ setup(
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "Operating System :: OS Independent",
         "License :: OSI Approved :: MIT License"
     ],
     long_description=long_description,
     long_description_content_type='text/markdown',
-    install_requires=['numpy==2.0.*', 'scipy==1.14.*', 'cexprtk==0.4.*'],
+    install_requires=['numpy==2.3.*', 'scipy==1.16.*', 'cexprtk==0.4.*'],
     extras_require={
         "dev": [
             "pytest==8.*",

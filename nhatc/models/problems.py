@@ -13,6 +13,7 @@ class SubProblem:
         self.index = -1
         self.type = type
         self._coordinator = None
+        self._successful_optimization = False
 
         if self.type not in [SubProblem.TYPE_DYNAMIC, SubProblem.TYPE_PROGRAMMATIC]:
             raise ValueError(f'Unknown subproblem type {self.type}')
