@@ -11,13 +11,17 @@ from nhatc.models.problems import SubProblem, ProgrammaticSubProblem, DynamicSub
 
 class Result:
     def __init__(self, successful_convergence, epsilon, epsilon_diff, f_star, x_star,
-                 process_time):
+                 process_time, iterations, epsilon_array, f_star_array, x_star_array):
         self.successful_convergence: bool = successful_convergence
         self.epsilon: float = epsilon
         self.epsilon_diff: float = epsilon_diff
         self.f_star = f_star
         self.x_star = x_star
         self.time = process_time
+        self.n_iterations = iterations
+        self.epsilon_array = epsilon_array
+        self.f_star_array = f_star_array
+        self.x_star_array = x_star_array
 
 
 class Coordinator:
@@ -272,6 +276,9 @@ class Coordinator:
         iteration = 0
         epsilon = 0
         epsilon_diff = -1
+        epsilon_list = []
+        f_star_list = []
+        x_star_list = []
 
         while iteration < max_iterations-1:
             q_previous = np.copy(self.q_current)
@@ -287,7 +294,12 @@ class Coordinator:
             # Total discrepancy between coupled vars in this loop iteration
             epsilon = norm(self.q_current)
 
-            # Todo: if ANY subsystem has failed to meet its constraints, continue.
+            # Store process data
+            epsilon_list.append(epsilon)
+            f_star_list.append(self.F_star.copy())
+            x_star_list.append(self.X.copy())
+
+            # if ANY subsystem has failed to meet its constraints, continue.
             constraints_met = True
             for subproblem in self.subproblems:
                 if not subproblem._successful_optimization:
@@ -314,12 +326,13 @@ class Coordinator:
 
             if has_converged:
                 process_time = time.process_time() - t_start
-                return Result(True, epsilon, epsilon_diff, self.F_star, self.X, process_time)
+                return Result(True, epsilon, epsilon_diff, self.F_star, self.X, process_time,
+                              iteration + 1, np.array(epsilon_list), np.array(f_star_list), np.array(x_star_list))
 
             iteration += 1
 
-        print(f"Failed to converge after {iteration+1} iterations")
-        print(f'Epsilon = {epsilon}')
+        print(f"Failed to converge after {iteration+1} iterations. Epsilon = {epsilon}")
         process_time = time.process_time() - t_start
-        return Result(False, epsilon, epsilon_diff, self.F_star, self.X, process_time)
+        return Result(False, epsilon, epsilon_diff, self.F_star, self.X, process_time,
+                      iteration, np.array(epsilon_list), np.array(f_star_list), np.array(x_star_list))
 

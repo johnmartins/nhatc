@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.1.2'
+VERSION = '0.1.3'
 DESCRIPTION = 'Library for running non-hierarchical multi-disciplinary optimization'
 
 with open("README.md", "r") as fh:
