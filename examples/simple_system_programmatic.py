@@ -5,18 +5,18 @@ np.random.seed(0)
 
 coordinator = Coordinator(verbose=True)
 coordinator.set_variables([
-    ATCVariable('a1', 0, 0, True, [3], 0, 10),
-    ATCVariable('b1', 1, 0, False, [4], 0, 10),
-    ATCVariable('w1', 2, 0, False, [5], 0, 10),
-    ATCVariable('a2', 3, 1, False, [0], 0, 10),
-    ATCVariable('b2', 4, 1, True, [1], 0, 10),
-    ATCVariable('w2', 5, 1, False, [2], 0, 10),
+    ATCVariable('a1', 0, 0, True, [3], 0.1, 10),
+    ATCVariable('b1', 1, 0, False, [4], 0.1, 10),
+    ATCVariable('w1', 2, 0, False, [5], 0.1, 10),
+    ATCVariable('a2', 3, 1, False, [0], 0.1, 10),
+    ATCVariable('b2', 4, 1, True, [1], 0.1, 10),
+    ATCVariable('w2', 5, 1, False, [2], 0.1, 10),
 ])
 
 
 def sp1_objective(X):
     b, w = X[[1, 2]]
-    a = w + (1/b**2)
+    a = w + (1/(b**2))
     f = (a + b) / w
     y = [a]
     return f, y
@@ -44,8 +44,8 @@ sp2.set_ineqs([sp2_ineq])
 
 coordinator.set_subproblems([sp1, sp2])
 
-# x0 = np.array([6.76911903, 9.46969758, 1.13955465, 6.54515886, 5.03847838, 4.48557725])
-x0 = coordinator.get_random_x0()
+x0 = coordinator.get_midpoint_x0()
+
 print(f'x0 = \t {x0}')
 res = coordinator.optimize(1000, x0,
                            beta=2.0,
