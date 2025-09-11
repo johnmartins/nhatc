@@ -1,5 +1,7 @@
+import numpy as np
 from nhatc import ATCVariable, Coordinator, ProgrammaticSubProblem
 
+np.random.seed(0)
 
 coordinator = Coordinator(verbose=True)
 coordinator.set_variables([
@@ -45,10 +47,10 @@ coordinator.set_subproblems([sp1, sp2])
 # x0 = np.array([6.76911903, 9.46969758, 1.13955465, 6.54515886, 5.03847838, 4.48557725])
 x0 = coordinator.get_random_x0()
 print(f'x0 = \t {x0}')
-res = coordinator.optimize(100, x0,
+res = coordinator.optimize(1000, x0,
                            beta=2.0,
                            gamma=0.25,
-                           convergence_threshold=1e-9,
+                           convergence_threshold=1e-6,
                            NI=60,
                            method='slsqp')
 
